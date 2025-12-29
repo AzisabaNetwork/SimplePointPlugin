@@ -40,12 +40,15 @@ public class GUIManager implements Listener {
                     int req = config.getInt(slot + ".requirement", 0);
 
                     ItemMeta meta = item.getItemMeta();
-                    List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
-                    lore.add("§8----------");
-                    lore.add("§e価格: §f" + price + " pt");
-                    lore.add("§b在庫: §f" + (stock == -1 ? "無限" : stock));
-                    if (req > 0) lore.add("§6必要解放pt: §f" + req);
-                    meta.setLore(lore);
+                    // ✨ 装飾モード(price: -1)でない場合のみ、SPPの要素を追加表示
+                    if (price != -1) {
+                        List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
+                        lore.add("§8----------");
+                        lore.add("§e価格: §f" + price + " pt");
+                        lore.add("§b在庫: §f" + (stock == -1 ? "無限" : stock));
+                        if (req > 0) lore.add("§6必要解放pt: §f" + req);
+                        meta.setLore(lore);
+                    }
                     item.setItemMeta(meta);
                     gui.setItem(slot, item);
                 } catch (Exception ignored) {}
@@ -104,8 +107,8 @@ public class GUIManager implements Listener {
         inv.setItem(4, s.item);
 
         // ボタン配置
-        inv.setItem(10, createGuiItem(Material.RED_STAINED_GLASS_PANE, "§c価格 -100", "§7現在: " + s.price));
-        inv.setItem(16, createGuiItem(Material.LIME_STAINED_GLASS_PANE, "§a価格 +100", "§7現在: " + s.price));
+        inv.setItem(10, createGuiItem(Material.RED_STAINED_GLASS_PANE, "§c価格 -100", "§7現在: " + (s.price == -1 ? "装飾中" : s.price)));
+        inv.setItem(16, createGuiItem(Material.LIME_STAINED_GLASS_PANE, "§a価格 +100", "§7現在: " + (s.price == -1 ? "装飾中" : s.price)));
 
         String stockDisplay = (s.stock == -1) ? "§b無限" : "§f" + s.stock;
         inv.setItem(11, createGuiItem(Material.PINK_STAINED_GLASS_PANE, "§c在庫 -1", "§7現在: " + stockDisplay));
@@ -113,6 +116,10 @@ public class GUIManager implements Listener {
 
         // 在庫トグルボタン (無限/有限切り替え)
         inv.setItem(12, createGuiItem(Material.COMPARATOR, "§f在庫設定切替", "§7クリックで §b無限 §7と §e数値 §7を切り替え"));
+
+        // ✨ 装飾モードトグルボタン
+        inv.setItem(18, createGuiItem(Material.PAINTING, "§d§l装飾モード切替",
+                "§7現在: " + (s.price == -1 ? "§aON (表示のみ)" : "§cOFF (販売用)") + "\n§8ONにすると価格・在庫が表示されません"));
 
         inv.setItem(13, createGuiItem(Material.GOLD_BLOCK, "§e§l保存", "§7スロット: " + s.slot));
         inv.setItem(22, createGuiItem(Material.BARRIER, "§4§l削除", ""));
@@ -123,8 +130,14 @@ public class GUIManager implements Listener {
         SettingSession s = sessions.get(player.getUniqueId());
         if (s == null) return;
 
-        if (slot == 10) s.price = Math.max(0, s.price - (click.isRightClick() ? 10 : 100));
-        else if (slot == 16) s.price += (click.isRightClick() ? 10 : 100);
+        if (slot == 10) {
+            if (s.price == -1) s.price = 0;
+            s.price = Math.max(0, s.price - (click.isRightClick() ? 10 : 100));
+        }
+        else if (slot == 16) {
+            if (s.price == -1) s.price = 0;
+            s.price += (click.isRightClick() ? 10 : 100);
+        }
         else if (slot == 11) {
             if (s.stock != -1) s.stock = Math.max(0, s.stock - 1);
         }
@@ -132,8 +145,11 @@ public class GUIManager implements Listener {
             if (s.stock == -1) s.stock = 1;
             else s.stock += (click.isRightClick() ? 10 : 1);
         }
-        else if (slot == 12) { // トグル
+        else if (slot == 12) { // 在庫トグル
             s.stock = (s.stock == -1) ? 1 : -1;
+        }
+        else if (slot == 18) { // ✨ 装飾モードトグル
+            s.price = (s.price == -1) ? 100 : -1;
         }
         else if (slot == 22) {
             plugin.getRewardManager().deleteReward(s.pointName, s.slot);
@@ -142,6 +158,7 @@ public class GUIManager implements Listener {
         }
         else if (slot == 13) {
             plugin.getRewardManager().saveReward(s.pointName, s.slot, s.item, s.price, s.stock);
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
             player.closeInventory();
             return;
         }
@@ -153,6 +170,10 @@ public class GUIManager implements Listener {
         if (config == null || !config.contains(String.valueOf(slot))) return;
 
         int price = config.getInt(slot + ".price");
+
+        // ✨ 装飾用アイテムなら購入処理を中断
+        if (price == -1) return;
+
         int stock = config.getInt(slot + ".stock", -1);
         int req = config.getInt(slot + ".requirement", 0);
 
@@ -167,16 +188,10 @@ public class GUIManager implements Listener {
         int balance = plugin.getPointManager().getPoint(pKey, player.getUniqueId());
 
         if (balance >= price) {
-            // 在庫減算
             if (stock > 0) plugin.getRewardManager().updateStock(pointName, slot, stock - 1);
-
-            // ポイント支払い
             plugin.getPointManager().addPoint(pKey, player.getUniqueId(), -price);
-
-            // アイテム付与
             player.getInventory().addItem(config.getItemStack(slot + ".item").clone());
 
-            // ✨ コマンド実行機能
             List<String> commands = config.getStringList(slot + ".commands");
             for (String cmd : commands) {
                 String processedCmd = cmd.replace("%player%", player.getName()).replace("%point%", pointName);
@@ -185,8 +200,10 @@ public class GUIManager implements Listener {
 
             plugin.getLogManager().logPurchase(player.getName(), pointName, price, slot);
             player.sendMessage("§a購入完了！");
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
             openRewardGUI(player, pointName, false);
         } else player.sendMessage("§cポイント不足");
+        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
     }
 
     private ItemStack createGuiItem(Material m, String name, String lore) {

@@ -143,6 +143,7 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§fあなたの順位: §7圏外");
         }
         player.sendMessage("§8§m--------------------------------------");
+        player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 1.0f);
     }
 
     @Override

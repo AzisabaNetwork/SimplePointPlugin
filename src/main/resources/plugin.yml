@@ -1,0 +1,11 @@
+name: SimplePointPlugin
+version: 1.0
+main: net.azisaba.simplepoint.SimplePointPlugin
+api-version: 1.16
+author: pino223
+commands:
+  spp:
+    description: SimplePointPlugin Admin Command
+    permission: spp.admin
+  spt:
+    description: SimplePointPlugin Player Command

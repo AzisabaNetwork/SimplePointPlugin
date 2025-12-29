@@ -22,12 +22,12 @@ public class RewardManager {
         }
     }
 
-    public FileConfiguration getRewardConfig(String pointName) {
-        if (configs.containsKey(pointName)) {
-            return configs.get(pointName);
+    public FileConfiguration getRewardConfig(String pointId) {
+        if (configs.containsKey(pointId)) {
+            return configs.get(pointId);
         }
 
-        File file = new File(rewardFolder, pointName + ".yml");
+        File file = new File(rewardFolder, pointId + ".yml");
         if (!file.exists()) {
             try {
                 file.createNewFile();
@@ -37,42 +37,44 @@ public class RewardManager {
         }
 
         FileConfiguration config = YamlConfiguration.loadConfiguration(file);
-        configs.put(pointName, config);
+        configs.put(pointId, config);
         return config;
     }
 
     /**
-     * 報酬アイテムを保存します (isPersonal 引数を追加)
+     * 報酬アイテムを保存します
+     * @param pointId ポイントの内部ID
+     * @param isPersonal 個人制限モードなら true, 共有在庫モードなら false
      */
-    public void saveReward(String pointName, int slot, ItemStack item, int price, int stock, boolean isPersonal) {
-        FileConfiguration config = getRewardConfig(pointName);
+    public void saveReward(String pointId, int slot, ItemStack item, int price, int stock, boolean isPersonal) {
+        FileConfiguration config = getRewardConfig(pointId);
         String path = String.valueOf(slot);
 
         config.set(path + ".item", item);
         config.set(path + ".price", price);
         config.set(path + ".stock", stock);
-        config.set(path + ".is_personal", isPersonal); // ✨ ここで保存
+        config.set(path + ".is_personal", isPersonal);
 
-        saveFile(pointName, config);
+        saveFile(pointId, config);
     }
 
-    public void updateStock(String pointName, int slot, int newStock) {
-        FileConfiguration config = getRewardConfig(pointName);
+    public void updateStock(String pointId, int slot, int newStock) {
+        FileConfiguration config = getRewardConfig(pointId);
         config.set(slot + ".stock", newStock);
-        saveFile(pointName, config);
+        saveFile(pointId, config);
     }
 
-    public void deleteReward(String pointName, int slot) {
-        FileConfiguration config = getRewardConfig(pointName);
+    public void deleteReward(String pointId, int slot) {
+        FileConfiguration config = getRewardConfig(pointId);
         config.set(String.valueOf(slot), null);
-        saveFile(pointName, config);
+        saveFile(pointId, config);
     }
 
-    private void saveFile(String pointName, FileConfiguration config) {
+    private void saveFile(String pointId, FileConfiguration config) {
         try {
-            config.save(new File(rewardFolder, pointName + ".yml"));
+            config.save(new File(rewardFolder, pointId + ".yml"));
         } catch (IOException e) {
-            plugin.getLogger().severe("Could not save reward config for " + pointName);
+            plugin.getLogger().severe("Could not save reward config for " + pointId);
             e.printStackTrace();
         }
     }

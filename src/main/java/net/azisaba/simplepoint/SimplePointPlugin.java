@@ -35,9 +35,11 @@ public class SimplePointPlugin extends JavaPlugin {
             SPPCommand spp = new SPPCommand(this);
             getCommand("spp").setExecutor(spp);
             getCommand("spp").setTabCompleter(spp);
+            getCommand("spp").setTabCompleter(new SPPTabCompleter(this));
         }
         if (getCommand("spt") != null) {
             getCommand("spt").setExecutor(new SPTCommand(this));
+            getCommand("spt").setTabCompleter(new SPTTabCompleter(this));
         }
         if (getCommand("sptt") != null) {
             getCommand("sptt").setExecutor(new SPTTCommand(this));

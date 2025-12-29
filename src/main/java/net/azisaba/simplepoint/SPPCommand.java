@@ -31,11 +31,26 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
 
         switch (sub) {
             case "create":
-                if (args.length < 2) return false;
-                if (plugin.getPointManager().createPointType(args[1])) {
-                    sender.sendMessage("§aポイント「" + args[1] + "」を新規作成しました。");
+                if (args.length < 3) {
+                    sender.sendMessage("§c使用法: /spp create <ID> <表示名>");
+                    return true;
+                }
+                String id = args[1];
+
+
+                StringBuilder dispNameBuilder = new StringBuilder();
+                for (int i = 2; i < args.length; i++) {
+                    if (i > 2) dispNameBuilder.append(" "); // 引数間にスペースを戻す
+                    dispNameBuilder.append(args[i]);
+                }
+                String displayName = dispNameBuilder.toString();
+
+                if (plugin.getPointManager().createPointType(id, displayName)) {
+                    sender.sendMessage("§aポイントを作成しました！");
+                    sender.sendMessage("§7内部ID: §f" + id);
+                    sender.sendMessage("§7表示名: §f" + plugin.getPointManager().getDisplayName(id));
                 } else {
-                    sender.sendMessage("§c既にそのポイントは存在します。");
+                    sender.sendMessage("§cそのIDは既に存在するか、作成に失敗しました。");
                 }
                 break;
 
@@ -188,17 +203,35 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender) {
-        sender.sendMessage("§6§lSimplePoint 管理ヘルプ");
-        sender.sendMessage("§a/spp create <名> §7- ポイント作成");
-        sender.sendMessage("§f/spp createteam <名> §7- チーム作成");
-        sender.sendMessage("§a/spp add/remove/set <人> <名> <数> §7- プレイヤーのポイント操作");
-        sender.sendMessage("§a/spp score <名> <人> §7- 個人ポイント確認");
-        sender.sendMessage("§a/spp rewardgui <名> §7- 報酬編集");
-        sender.sendMessage("§f/spp teamrewardgui <チーム> §7- チーム報酬編集");
-        sender.sendMessage("§f/spp setreq <名> <スロット> <pt> §7- 解放に必要なポイント数設定");
-        sender.sendMessage("§a/spp ranking <名> §7- ランキング表示");
-        sender.sendMessage("§f/spp toggleranking <名> §7- ショップ/ランキングの有効化切替");
-        sender.sendMessage("§f/spp help §7- このヘルプを表示");
+        sender.sendMessage("§8§m-----------------------------------------");
+        sender.sendMessage("   §6§lSimplePoint §e§l管理マネージャー");
+        sender.sendMessage("");
+
+        // 基本操作 (強調)
+        sender.sendMessage(" §e§l▶ §a§lポイント基本操作");
+        sender.sendMessage("  §f/spp §a§lcreate §b<ID> <表示名...> §7- 新規作成");
+        sender.sendMessage("  §f/spp §a§ladd §b<ID> <プレイヤー> <数> §7- 付与");
+        sender.sendMessage("  §f/spp §a§lremove §b<ID> <プレイヤー> <数> §7- 剥奪");
+        sender.sendMessage("  §f/spp §a§lset §b<ID> <プレイヤー> <数> §7- 上書き");
+        sender.sendMessage("");
+
+        // 確認・報酬 (強調)
+        sender.sendMessage(" §e§l▶ §a§lデータ確認・報酬設定");
+        sender.sendMessage("  §f/spp §a§lscore §b<ID> <プレイヤー> §7- 所持状況確認");
+        sender.sendMessage("  §f/spp §a§lrewardgui §b<ID> §7- 報酬スロット編集");
+        sender.sendMessage("  §f/spp §a§lranking §b<ID> §7- ランキング表示");
+        sender.sendMessage("");
+
+        // システム設定
+        sender.sendMessage(" §e§l▶ §fシステム設定");
+        sender.sendMessage("  §f/spp §fsetreq §7<ID> <Slot> <pt> - 解放条件設定");
+        sender.sendMessage("  §f/spp §ftoggleranking §7<ID> - ランキング有効化切替");
+        sender.sendMessage("  §f/spp §fcreateteam §7<チーム名> - チームデータ作成");
+        sender.sendMessage("  §f/spp §freload §7- コンフィグリロード");
+
+        sender.sendMessage("");
+        sender.sendMessage(" §7※ §b<ID>§7は内部用英数字、§b<表示名>§7は日本語/色可");
+        sender.sendMessage("§8§m-----------------------------------------");
     }
 
     @Override

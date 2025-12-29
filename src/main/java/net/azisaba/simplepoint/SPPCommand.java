@@ -95,6 +95,22 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage("§a設定をリロードしました。");
                 break;
 
+            case "score":
+                if (args.length < 3) return false;
+                OfflinePlayer targetPlayer = Bukkit.getOfflinePlayer(args[2]);
+                int score = plugin.getPointManager().getPoint(args[1], targetPlayer.getUniqueId());
+                sender.sendMessage("§e" + targetPlayer.getName() + " の " + args[1] + ": §f" + score + "pt");
+                break;
+
+            case "toggleranking":
+                if (args.length < 2) return false;
+                FileConfiguration cfg = plugin.getPointManager().getPointConfig(args[1]);
+                boolean newState = !cfg.getBoolean("_settings.ranking_enabled", true);
+                cfg.set("_settings.ranking_enabled", newState);
+                plugin.getPointManager().saveConfig(args[1], cfg);
+                sender.sendMessage("§a" + args[1] + " の報酬ショップ/ランキングを " + (newState ? "§2有効" : "§4無効") + " §aにしました。");
+                break;
+
             default:
                 sendHelp(sender);
                 break;
@@ -130,18 +146,20 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("§6§lSimplePoint 管理ヘルプ");
         sender.sendMessage("§f/spp create <名> §7- ポイント作成");
+        sender.sendMessage("§f/spp createteam <名> §7- チーム作成");
         sender.sendMessage("§f/spp add <人> <名> <数> §7- ポイント付与");
         sender.sendMessage("§f/spp rewardgui <名> §7- 報酬編集");
         sender.sendMessage("§f/spp teamrewardgui <チーム> §7- チーム報酬編集");
         sender.sendMessage("§f/spp setreq <名> <スロット> <pt> §7- 解放条件設定");
-        sender.sendMessage("§f/spp createteam <名> §7- チーム作成");
+        sender.sendMessage("§f/spp score <名> <人> §7- 個人ポイント確認");
+        sender.sendMessage("§f/spp toggleranking <名> §7- ランキングを有効/無効");
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
-            StringUtil.copyPartialMatches(args[0], Arrays.asList("create", "add", "set", "rewardgui", "teamrewardgui", "createteam", "setreq", "ranking", "reload"), completions);
+            StringUtil.copyPartialMatches(args[0], Arrays.asList("create", "add", "set", "rewardgui", "teamrewardgui", "createteam", "setreq", "ranking", "reload","score","toggleranking"), completions);
         } else if (args.length == 3 && (args[0].equals("add") || args[0].equals("set") || args[0].equals("rewardgui") || args[0].equals("setreq"))) {
             StringUtil.copyPartialMatches(args[2], plugin.getPointManager().getPointNames(), completions);
         }

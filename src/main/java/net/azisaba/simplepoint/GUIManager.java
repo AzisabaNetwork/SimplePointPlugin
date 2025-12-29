@@ -202,8 +202,11 @@ public class GUIManager implements Listener {
             player.sendMessage("§a購入完了！");
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
             openRewardGUI(player, pointName, false);
-        } else player.sendMessage("§cポイント不足");
-        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+        } else {
+            player.sendMessage("§cポイント不足");
+
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+        }
     }
 
     private ItemStack createGuiItem(Material m, String name, String lore) {

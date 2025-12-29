@@ -21,6 +21,12 @@ public class TeamManager {
         this.config = YamlConfiguration.loadConfiguration(file);
     }
 
+    // 追加: チーム名のリストを取得
+    public Set<String> getTeamNames() {
+        if (!config.contains("teams")) return new HashSet<>();
+        return config.getConfigurationSection("teams").getKeys(false);
+    }
+
     public void createTeam(String teamName) {
         config.set("teams." + teamName + ".points", 0);
         config.set("teams." + teamName + ".members", new ArrayList<String>());
@@ -30,18 +36,15 @@ public class TeamManager {
     public String joinRandomTeam(UUID uuid) {
         if (getPlayerTeam(uuid) != null) return "already_joined";
         if (!config.contains("teams")) return "no_teams";
-
         String bestTeam = null;
         int minMembers = Integer.MAX_VALUE;
-
-        for (String teamName : config.getConfigurationSection("teams").getKeys(false)) {
+        for (String teamName : getTeamNames()) {
             int count = getMemberCount(teamName);
             if (count < minMembers) {
                 minMembers = count;
                 bestTeam = teamName;
             }
         }
-
         if (bestTeam != null) {
             List<String> members = config.getStringList("teams." + bestTeam + ".members");
             members.add(uuid.toString());
@@ -52,8 +55,7 @@ public class TeamManager {
     }
 
     public String getPlayerTeam(UUID uuid) {
-        if (!config.contains("teams")) return null;
-        for (String teamName : config.getConfigurationSection("teams").getKeys(false)) {
+        for (String teamName : getTeamNames()) {
             if (config.getStringList("teams." + teamName + ".members").contains(uuid.toString())) return teamName;
         }
         return null;
@@ -75,7 +77,7 @@ public class TeamManager {
     public void addContribution(String teamName, UUID uuid, int amount) {
         int current = config.getInt("teams." + teamName + ".contrib." + uuid.toString(), 0);
         config.set("teams." + teamName + ".contrib." + uuid.toString(), current + amount);
-        addTeamPoints(teamName, amount); // チームの総ポイントにも加算
+        addTeamPoints(teamName, amount);
         save();
     }
 

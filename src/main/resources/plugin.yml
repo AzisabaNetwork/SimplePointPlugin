@@ -9,3 +9,5 @@ commands:
     permission: spp.admin
   spt:
     description: SimplePointPlugin Player Command
+  sptt:
+    description: チーム用コマンド

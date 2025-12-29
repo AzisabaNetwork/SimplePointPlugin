@@ -12,21 +12,38 @@ public class SimplePointPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        // settings.ymlがない場合は作成する
-        saveResource("settings.yml", false);
+        // 1. settings.yml の書き出し (エラー対策)
+        try {
+            if (!new File(getDataFolder(), "settings.yml").exists()) {
+                saveResource("settings.yml", false);
+            }
+        } catch (Exception e) {
+            getLogger().warning("settings.yml resource not found in JAR. Using defaults.");
+        }
 
+        // 2. マネージャーの初期化
         this.pointManager = new PointManager(this);
         this.rewardManager = new RewardManager(this);
         this.logManager = new LogManager(this);
         this.teamManager = new TeamManager(this);
         this.guiManager = new GUIManager(this);
 
+        // 3. イベントとコマンドの登録
         getServer().getPluginManager().registerEvents(guiManager, this);
 
-        getCommand("spp").setExecutor(new SPPCommand(this));
-        getCommand("spt").setExecutor(new SPTCommand(this));
+        if (getCommand("spp") != null) {
+            SPPCommand spp = new SPPCommand(this);
+            getCommand("spp").setExecutor(spp);
+            getCommand("spp").setTabCompleter(spp);
+        }
+        if (getCommand("spt") != null) {
+            getCommand("spt").setExecutor(new SPTCommand(this));
+        }
+        if (getCommand("sptt") != null) {
+            getCommand("sptt").setExecutor(new SPTTCommand(this));
+        }
 
-        getLogger().info("SimplePointPlugin has been enabled! ✨");
+        getLogger().info("SimplePointPlugin v1.2 Enabled! 🚀");
     }
 
     public PointManager getPointManager() { return pointManager; }

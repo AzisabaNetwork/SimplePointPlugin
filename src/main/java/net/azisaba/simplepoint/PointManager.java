@@ -4,9 +4,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 public class PointManager {
     private final SimplePointPlugin plugin;
@@ -20,12 +18,16 @@ public class PointManager {
         }
     }
 
-    // ポイントファイルの新規作成
     public boolean createPointType(String name) {
         File file = new File(dataFolder, name + ".yml");
         if (file.exists()) return false;
         try {
             file.createNewFile();
+            // 初期設定を書き込む
+            FileConfiguration config = YamlConfiguration.loadConfiguration(file);
+            config.set("_settings.enabled", true);
+            config.set("_settings.ranking_enabled", true);
+            config.save(file);
             return true;
         } catch (IOException e) {
             e.printStackTrace();
@@ -33,22 +35,36 @@ public class PointManager {
         }
     }
 
-    // ポイントの加算
-    public void addPoint(String pointName, UUID uuid, int amount) {
+    public FileConfiguration getPointConfig(String pointName) {
         File file = new File(dataFolder, pointName + ".yml");
-        if (!file.exists()) return;
+        if (!file.exists()) return null;
+        return YamlConfiguration.loadConfiguration(file);
+    }
 
-        FileConfiguration config = YamlConfiguration.loadConfiguration(file);
-        int current = config.getInt(uuid.toString(), 0);
-        config.set(uuid.toString(), current + amount);
+    public void saveConfig(String pointName, FileConfiguration config) {
         try {
-            config.save(file);
+            config.save(new File(dataFolder, pointName + ".yml"));
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    // 存在するポイント名の一覧を取得（補完用）
+    public int getPoint(String pointName, UUID uuid) {
+        FileConfiguration config = getPointConfig(pointName);
+        return (config != null) ? config.getInt(uuid.toString(), 0) : 0;
+    }
+
+    public void setPoint(String pointName, UUID uuid, int amount) {
+        FileConfiguration config = getPointConfig(pointName);
+        if (config == null) return;
+        config.set(uuid.toString(), Math.max(0, amount));
+        saveConfig(pointName, config);
+    }
+
+    public void addPoint(String pointName, UUID uuid, int amount) {
+        setPoint(pointName, uuid, getPoint(pointName, uuid) + amount);
+    }
+
     public List<String> getPointNames() {
         List<String> names = new ArrayList<>();
         File[] files = dataFolder.listFiles();

@@ -1,7 +1,5 @@
 package net.azisaba.simplepoint;
 
-import net.azisaba.SPPCommand;
-import net.azisaba.simplepoint.PointManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class SimplePointPlugin extends JavaPlugin {
@@ -10,14 +8,19 @@ public class SimplePointPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        // マネージャーの初期化
         this.pointManager = new PointManager(this);
 
-        // コマンドの登録
+        // 管理用コマンド登録
         SPPCommand sppCommand = new SPPCommand(this);
         getCommand("spp").setExecutor(sppCommand);
         getCommand("spp").setTabCompleter(sppCommand);
 
+        // プレイヤー用コマンド登録
+        SPTCommand sptCommand = new SPTCommand(this);
+        getCommand("spt").setExecutor(sptCommand);
+        getCommand("spt").setTabCompleter(sptCommand);
+
+        saveDefaultConfig();
         getLogger().info("SimplePointPlugin has been enabled!");
     }
 

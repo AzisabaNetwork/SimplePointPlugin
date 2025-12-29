@@ -7,6 +7,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 
 import java.util.*;
@@ -66,6 +67,11 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
                 if (args.length < 2) return false;
                 showRanking(sender, args[1]);
                 return true;
+
+            case "rewardgui":
+                if (args.length < 2) return false;
+                plugin.getGuiManager().openRewardGUI((Player)sender, args[1], true);
+                return true;
         }
         return true;
     }
@@ -116,7 +122,8 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§f/spp add/remove/set <name> <player> <num>");
         sender.sendMessage("§f/spp score <name> <player> - 確認");
         sender.sendMessage("§f/spp ranking <name> - ランキング表示");
-        sender.sendMessage("§f/spp toggle <name> - 受取可否");
+        sender.sendMessage("§f/spp toggle <name> - 報酬受取可否");
+        sender.sendMessage("§f/spp rewardgui <name> - 報酬設定GUI");
         sender.sendMessage("§f/spp reload - リロード");
     }
 

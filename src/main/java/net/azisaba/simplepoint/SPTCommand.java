@@ -54,13 +54,7 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 break;
 
             case "reward":
-                // 報酬GUIが有効かチェック（管理者のtoggle設定）
-                if (!config.getBoolean("_settings.ranking_enabled", true)) {
-                    player.sendMessage("§c現在、この報酬GUIは利用できません。");
-                    return true;
-                }
-                // TODO: GUIを開く処理 (次のステップで実装)
-                player.sendMessage("§a" + pointName + " の報酬GUIを開きます...（実装中）");
+                plugin.getGuiManager().openRewardGUI(player, pointName, false);
                 break;
 
             default:

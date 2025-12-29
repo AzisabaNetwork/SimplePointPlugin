@@ -163,8 +163,11 @@ public class SPPCommand implements CommandExecutor {
 
     private void showRanking(CommandSender sender, String pointName) {
         FileConfiguration config = plugin.getPointManager().getPointConfig(pointName);
+        // ✨ IDから表示名（色付き）を取得
+        String displayName = plugin.getPointManager().getDisplayName(pointName);
+
         if (config == null || !config.getBoolean("_settings.ranking_enabled", true)) {
-            sender.sendMessage("§cランキングは現在無効です。");
+            sender.sendMessage("§c" + displayName + " §cのランキングは現在無効です。");
             return;
         }
 
@@ -181,13 +184,16 @@ public class SPPCommand implements CommandExecutor {
         List<Map.Entry<String, Integer>> list = new ArrayList<>(scores.entrySet());
         list.sort((a, b) -> b.getValue().compareTo(a.getValue()));
 
+        // --- 全体放送用のメッセージ構築 ---
         Bukkit.broadcastMessage("§7§m--------------------------------------");
-        Bukkit.broadcastMessage("§8§l[§6§lRanking§8§l] §e§l" + pointName.toUpperCase());
+        // ✨ IDではなく表示名を使用
+        Bukkit.broadcastMessage("§8§l[§6§lRanking§8§l] §e§l" + displayName);
 
         for (int i = 0; i < Math.min(list.size(), 7); i++) {
             String color = (i == 0) ? "§e§l" : (i == 1) ? "§f§l" : (i == 2) ? "§6§l" : "§7";
             String name = list.get(i).getKey();
             int score = list.get(i).getValue();
+
             Bukkit.broadcastMessage(color + (i + 1) + ". §r" + name + " §7- §b" + score + " pt");
         }
         Bukkit.broadcastMessage("§7§m--------------------------------------");

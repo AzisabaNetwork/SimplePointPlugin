@@ -45,6 +45,18 @@ public class SimplePointPlugin extends JavaPlugin {
             getCommand("spt").setTabCompleter(new SPTTabCompleter(this));
         }
 
+        if (getCommand("myp") != null) {
+            MYPCommand myp = new MYPCommand(this);
+            getCommand("myp").setExecutor(myp);
+            getCommand("myp").setTabCompleter(myp);
+        }
+
+        if (getCommand("ranking") != null) {
+            RankingShortcutCommand rk = new RankingShortcutCommand(this);
+            getCommand("ranking").setExecutor(rk);
+            getCommand("ranking").setTabCompleter(rk);
+        }
+
         // --- SPTT Command ---
         if (getCommand("sptt") != null) {
             getCommand("sptt").setExecutor(new SPTTCommand(this));

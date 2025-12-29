@@ -12,3 +12,9 @@ commands:
   sptt:
     description: チーム用コマンド
     permission: sptt.admin
+  myp:
+    description: Check your points quickly
+    usage: /myp <id>
+  ranking:
+    description: Check the ranking quickly
+    usage: /ranking <id>

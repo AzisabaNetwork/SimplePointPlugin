@@ -1,6 +1,8 @@
 package net.azisaba.simplepoint;
 
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.Sound;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -10,6 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class SPTCommand implements CommandExecutor, TabCompleter {
     private final SimplePointPlugin plugin;
@@ -43,19 +46,21 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 p.sendMessage("§c使用法: /spt myp <ポイント名>");
                 return true;
             }
-            String pointName = args[1];
-            if (plugin.getPointManager().getPointConfig(pointName) == null) {
+            String pointId = args[1];
+            if (plugin.getPointManager().getPointConfig(pointId) == null) {
                 p.sendMessage("§cそのポイント名は存在しません。");
                 return true;
             }
 
-            int current = plugin.getPointManager().getPoint(pointName, p.getUniqueId());
-            int total = plugin.getPointManager().getTotalPoint(pointName, p.getUniqueId());
+            // ✨ 表示名を取得
+            String displayName = plugin.getPointManager().getDisplayName(pointId);
+            int current = plugin.getPointManager().getPoint(pointId, p.getUniqueId());
+            int total = plugin.getPointManager().getTotalPoint(pointId, p.getUniqueId());
 
-            p.sendMessage("§8§m----------§r §b§l" + pointName.toUpperCase() + " STATUS §8§m----------");
+            p.sendMessage("§8§m-------§r " + displayName + " §b§lSTATUS §8§m-------");
             p.sendMessage("§7現在の所持ポイント: §e" + current + " pt");
             p.sendMessage("§7これまでの累計獲得: §a" + total + " pt");
-            p.sendMessage("§8§m----------------------------");
+            p.sendMessage("§8§m---------------------");
             return true;
         }
 
@@ -64,17 +69,20 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 p.sendMessage("§c使用法: /spt reward <ポイント名>");
                 return true;
             }
-            String pointName = args[1];
-            FileConfiguration cfg = plugin.getPointManager().getPointConfig(pointName);
+            String pointId = args[1];
+            FileConfiguration cfg = plugin.getPointManager().getPointConfig(pointId);
+            String displayName = plugin.getPointManager().getDisplayName(pointId);
+
             if (cfg == null) {
                 p.sendMessage("§cそのポイント名は存在しません。");
                 return true;
             }
             if (!cfg.getBoolean("_settings.ranking_enabled", true)) {
-                p.sendMessage("§c現在、この報酬ショップは利用できません。");
+                p.sendMessage("§c現在、" + displayName + " §cの報酬ショップは利用できません。");
                 return true;
             }
-            plugin.getGuiManager().openRewardGUI(p, pointName, false);
+            // 内部IDを使ってGUIを開く
+            plugin.getGuiManager().openRewardGUI(p, pointId, false);
             return true;
         }
 
@@ -90,14 +98,15 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void showPersonalRanking(Player player, String pointName) {
-        FileConfiguration config = plugin.getPointManager().getPointConfig(pointName);
+    private void showPersonalRanking(Player player, String pointId) {
+        FileConfiguration config = plugin.getPointManager().getPointConfig(pointId);
+        String displayName = plugin.getPointManager().getDisplayName(pointId);
+
         if (config == null || !config.getBoolean("_settings.ranking_enabled", true)) {
-            player.sendMessage("§cこのポイントのランキングは非公開です。");
+            player.sendMessage("§c" + displayName + " §cのランキングは非公開です。");
             return;
         }
 
-        // データの集計 (UUID -> 累計ポイント)
         Map<UUID, Integer> allScores = new HashMap<>();
         for (String key : config.getKeys(false)) {
             if (key.startsWith("_")) continue;
@@ -108,11 +117,9 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
             } catch (IllegalArgumentException ignored) {}
         }
 
-        // ソート
         List<Map.Entry<UUID, Integer>> sortedList = new ArrayList<>(allScores.entrySet());
         sortedList.sort((a, b) -> b.getValue().compareTo(a.getValue()));
 
-        // 自分の順位特定
         int myRank = -1;
         int myScore = 0;
         for (int i = 0; i < sortedList.size(); i++) {
@@ -123,12 +130,12 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        player.sendMessage("§8§m----------§r §6§l" + pointName.toUpperCase() + " RANKING §8§m----------");
+        player.sendMessage("§8§m----------§r " + displayName + " §6§lRANKING §8§m----------");
 
-        // 上位7名を表示
         for (int i = 0; i < Math.min(sortedList.size(), 7); i++) {
             UUID uuid = sortedList.get(i).getKey();
-            String name = Bukkit.getOfflinePlayer(uuid).getName();
+            OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
+            String name = op.getName();
             int score = sortedList.get(i).getValue();
 
             String color = (i == 0) ? "§e" : (i == 1) ? "§f" : (i == 2) ? "§6" : "§7";
@@ -143,7 +150,7 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§fあなたの順位: §7圏外");
         }
         player.sendMessage("§8§m--------------------------------------");
-        player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 1.0f);
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 1.0f);
     }
 
     @Override
@@ -152,6 +159,7 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             StringUtil.copyPartialMatches(args[0], Arrays.asList("myp", "reward", "ranking", "help"), completions);
         } else if (args.length == 2 && Arrays.asList("myp", "reward", "ranking").contains(args[0].toLowerCase())) {
+            // タブ補完は内部IDを出す（コマンド引数がIDであるため）
             StringUtil.copyPartialMatches(args[1], plugin.getPointManager().getPointNames(), completions);
         }
         return completions;

@@ -92,18 +92,30 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
                 break;
 
             case "setreq":
-                if (args.length < 4) return false;
+                // ... 前後の引数チェックなどは既存通り ...
                 String pName = args[1];
                 int slot = Integer.parseInt(args[2]);
                 int req = Integer.parseInt(args[3]);
+
                 FileConfiguration config = plugin.getRewardManager().getRewardConfig(pName);
-                config.set(slot + ".requirement", req);
-                // 既存のデータを維持して保存
-                plugin.getRewardManager().saveReward(pName, slot,
-                        config.getItemStack(slot + ".item"),
-                        config.getInt(slot + ".price", 100),
-                        config.getInt(slot + ".stock", -1));
-                sender.sendMessage("§a" + pName + " " + slot + "番に解放条件 " + req + " pt を設定しました。");
+                if (config.contains(String.valueOf(slot))) {
+                    // 解放条件(requirement)だけをセット
+                    config.set(slot + ".requirement", req);
+
+                    // ✨ saveReward の引数に config から読み取った is_personal を追加して呼び出す
+                    plugin.getRewardManager().saveReward(
+                            pName,
+                            slot,
+                            config.getItemStack(slot + ".item"),
+                            config.getInt(slot + ".price", 100),
+                            config.getInt(slot + ".stock", -1),
+                            config.getBoolean(slot + ".is_personal", false) // ← ここを追加！
+                    );
+
+                    sender.sendMessage("§a" + pName + " " + slot + "番に解放条件 " + req + " pt を設定しました。");
+                } else {
+                    sender.sendMessage("§c指定されたスロットに報酬が存在しません。");
+                }
                 break;
 
             case "ranking":

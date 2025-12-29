@@ -16,16 +16,12 @@ public class RewardManager {
 
     public RewardManager(SimplePointPlugin plugin) {
         this.plugin = plugin;
-        // rewards フォルダを作成
         this.rewardFolder = new File(plugin.getDataFolder(), "rewards");
         if (!rewardFolder.exists()) {
             rewardFolder.mkdirs();
         }
     }
 
-    /**
-     * ポイント名に対応する報酬設定ファイルを取得またはロードします
-     */
     public FileConfiguration getRewardConfig(String pointName) {
         if (configs.containsKey(pointName)) {
             return configs.get(pointName);
@@ -46,40 +42,32 @@ public class RewardManager {
     }
 
     /**
-     * 報酬アイテムを保存します
+     * 報酬アイテムを保存します (isPersonal 引数を追加)
      */
-    public void saveReward(String pointName, int slot, ItemStack item, int price, int stock) {
+    public void saveReward(String pointName, int slot, ItemStack item, int price, int stock, boolean isPersonal) {
         FileConfiguration config = getRewardConfig(pointName);
         String path = String.valueOf(slot);
 
         config.set(path + ".item", item);
         config.set(path + ".price", price);
         config.set(path + ".stock", stock);
+        config.set(path + ".is_personal", isPersonal); // ✨ ここで保存
 
         saveFile(pointName, config);
     }
 
-    /**
-     * 在庫数のみを更新します
-     */
     public void updateStock(String pointName, int slot, int newStock) {
         FileConfiguration config = getRewardConfig(pointName);
         config.set(slot + ".stock", newStock);
         saveFile(pointName, config);
     }
 
-    /**
-     * 指定スロットの報酬を削除します
-     */
     public void deleteReward(String pointName, int slot) {
         FileConfiguration config = getRewardConfig(pointName);
         config.set(String.valueOf(slot), null);
         saveFile(pointName, config);
     }
 
-    /**
-     * ファイルに物理保存します
-     */
     private void saveFile(String pointName, FileConfiguration config) {
         try {
             config.save(new File(rewardFolder, pointName + ".yml"));
@@ -89,9 +77,6 @@ public class RewardManager {
         }
     }
 
-    /**
-     * メモリ上のキャッシュをクリア（リロード用）
-     */
     public void reload() {
         configs.clear();
     }

@@ -88,4 +88,13 @@ public class PointManager {
         }
         return names;
     }
+
+    public void savePointConfig(String pointName) {
+        FileConfiguration config = getPointConfig(pointName);
+        try {
+            config.save(new File(pointFolder, pointName + ".yml"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

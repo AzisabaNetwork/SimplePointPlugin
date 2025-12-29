@@ -12,7 +12,7 @@ public class SimplePointPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        // 1. settings.yml の書き出し (エラー対策)
+        // 1. settings.yml の書き出し
         try {
             if (!new File(getDataFolder(), "settings.yml").exists()) {
                 saveResource("settings.yml", false);
@@ -31,16 +31,21 @@ public class SimplePointPlugin extends JavaPlugin {
         // 3. イベントとコマンドの登録
         getServer().getPluginManager().registerEvents(guiManager, this);
 
+        // --- SPP Command ---
         if (getCommand("spp") != null) {
-            SPPCommand spp = new SPPCommand(this);
-            getCommand("spp").setExecutor(spp);
-            getCommand("spp").setTabCompleter(spp);
+            SPPCommand sppExecutor = new SPPCommand(this);
+            getCommand("spp").setExecutor(sppExecutor);
+            // ✨ 修正: SPPCommand自身ではなく、専用の補完クラスのみをセット
             getCommand("spp").setTabCompleter(new SPPTabCompleter(this));
         }
+
+        // --- SPT Command ---
         if (getCommand("spt") != null) {
             getCommand("spt").setExecutor(new SPTCommand(this));
             getCommand("spt").setTabCompleter(new SPTTabCompleter(this));
         }
+
+        // --- SPTT Command ---
         if (getCommand("sptt") != null) {
             getCommand("sptt").setExecutor(new SPTTCommand(this));
         }
@@ -53,11 +58,9 @@ public class SimplePointPlugin extends JavaPlugin {
     public GUIManager getGuiManager() { return guiManager; }
     public LogManager getLogManager() { return logManager; }
     public TeamManager getTeamManager() { return teamManager; }
-    public void reloadAllConfig() {
-        // Bukkit標準のconfig.ymlリロード
-        reloadConfig();
 
-        // 各マネージャーのキャッシュ/ファイルをリロード
+    public void reloadAllConfig() {
+        reloadConfig();
         if (rewardManager != null) rewardManager.reload();
         if (pointManager != null) pointManager.reload();
         if (teamManager != null) teamManager.loadTeams();

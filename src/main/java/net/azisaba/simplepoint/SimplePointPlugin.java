@@ -51,4 +51,25 @@ public class SimplePointPlugin extends JavaPlugin {
     public GUIManager getGuiManager() { return guiManager; }
     public LogManager getLogManager() { return logManager; }
     public TeamManager getTeamManager() { return teamManager; }
+    public void reloadAllConfig() {
+        // 1. config.yml のリロード
+        reloadConfig();
+
+        // 2. RewardManager のキャッシュリロード
+        if (rewardManager != null) {
+            rewardManager.reload();
+        }
+
+        // 3. TeamManager のリロード (ファイルから読み直し)
+        if (teamManager != null) {
+            teamManager.loadTeams(); // TeamManagerにこのメソッドがある場合
+        }
+
+        // 4. PointManager のキャッシュリロード
+        if (pointManager != null) {
+            pointManager.reload(); // PointManagerにキャッシュがある場合
+        }
+
+        getLogger().info("All configurations reloaded.");
+    }
 }

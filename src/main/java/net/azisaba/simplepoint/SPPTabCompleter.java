@@ -24,14 +24,14 @@ public class SPPTabCompleter implements TabCompleter {
 
         // 1. サブコマンドの補完: /spp <ここ>
         if (args.length == 1) {
-            List<String> subCommands = Arrays.asList("create", "add", "remove", "set", "score", "rewardgui", "setreq", "ranking", "toggleranking", "reload", "help");
+            List<String> subCommands = Arrays.asList("togglereward","create", "add", "remove", "set", "score", "rewardgui", "setreq", "ranking", "toggleranking", "reload", "help");
             StringUtil.copyPartialMatches(args[0], subCommands, completions);
         }
 
         // 2. 第2引数の補完: /spp <sub> <ここ>
         else if (args.length == 2) {
             // IDが必要なコマンド群
-            List<String> needsIdAsSecond = Arrays.asList("add", "remove", "set", "score", "rewardgui", "setreq", "ranking", "toggleranking");
+            List<String> needsIdAsSecond = Arrays.asList("add", "remove", "set", "score", "rewardgui", "setreq", "ranking", "togglereward","toggleranking");
 
             if (needsIdAsSecond.contains(sub)) {
                 List<String> pointIds = plugin.getPointManager().getPointNames();

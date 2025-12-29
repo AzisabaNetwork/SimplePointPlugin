@@ -4,52 +4,57 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class LogManager {
     private final SimplePointPlugin plugin;
-    private final File logFile;
+    private final File logFolder;
 
     public LogManager(SimplePointPlugin plugin) {
         this.plugin = plugin;
-        this.logFile = new File(plugin.getDataFolder(), "logs.csv");
-
-        // ファイルが新規作成された場合、ヘッダーを書き込む
-        if (!logFile.exists()) {
-            try {
-                logFile.createNewFile();
-                write("timestamp_ms,type,player,target_point,amount_or_slot,info");
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        // 1. データフォルダの中に「logs」フォルダを作成
+        this.logFolder = new File(plugin.getDataFolder(), "logs");
+        if (!logFolder.exists()) {
+            logFolder.mkdirs();
         }
     }
 
     /**
-     * 購入ログを記録
+     * ポイント変更のログを日付別のファイルに記録する
      */
-    public void logPurchase(String playerName, String pointName, int price, int slot) {
-        // 形式: タイムスタンプ,種別,プレイヤー,ポイント名,スロット,価格
-        String message = String.format("%d,PURCHASE,%s,%s,%d,%d",
-                System.currentTimeMillis(), playerName, pointName, slot, price);
-        write(message);
-    }
+    public void logPointChange(String playerName, String pointId, int amount, String type) {
+        // 2. 今日の日付でファイル名を作成 (例: 2023-10-27.log)
+        String fileName = new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + ".log";
+        File logFile = new File(logFolder, fileName);
 
-    /**
-     * ポイント変動ログを記録
-     */
-    public void logPointChange(String playerName, String pointName, int amount, String type) {
-        // 形式: タイムスタンプ,種別,プレイヤー,ポイント名,変動量,備考
-        String message = String.format("%d,POINT_%s,%s,%s,%d,",
-                System.currentTimeMillis(), type.toUpperCase(), playerName, pointName, amount);
-        write(message);
-    }
+        // 3. ログの時刻と内容を構築
+        String timeStamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        // [時刻] プレイヤー名, ポイントID, 増減量, 操作タイプ
+        String logMessage = String.format("[%s] %s, %s, %d, %s", timeStamp, playerName, pointId, amount, type);
 
-    private void write(String message) {
+        // 4. ファイルに書き込み (trueで追記モード)
         try (FileWriter fw = new FileWriter(logFile, true);
              PrintWriter pw = new PrintWriter(fw)) {
-            pw.println(message);
+            pw.println(logMessage);
         } catch (IOException e) {
-            plugin.getLogger().warning("Could not write to CSV log file: " + e.getMessage());
+            plugin.getLogger().severe("ログの書き込みに失敗しました: " + e.getMessage());
+        }
+    }
+    public void logRewardPurchase(String playerName, String pointId, String rewardName, int price) {
+        String fileName = new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + ".log";
+        File logFile = new File(logFolder, fileName);
+
+        String timeStamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        // [時刻] [PURCHASE] プレイヤー名, ポイントID, 報酬名, 消費ポイント
+        String logMessage = String.format("[%s] [PURCHASE] %s, %s, %s, %d pt",
+                timeStamp, playerName, pointId, rewardName, price);
+
+        try (FileWriter fw = new FileWriter(logFile, true);
+             PrintWriter pw = new PrintWriter(fw)) {
+            pw.println(logMessage);
+        } catch (IOException e) {
+            plugin.getLogger().severe("購入ログの書き込みに失敗しました: " + e.getMessage());
         }
     }
 }

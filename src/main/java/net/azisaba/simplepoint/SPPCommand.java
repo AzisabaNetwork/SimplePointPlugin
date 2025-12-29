@@ -154,6 +154,29 @@ public class SPPCommand implements CommandExecutor {
                 sender.sendMessage("§a[SimplePoint] 設定と報酬データをリロードしました。");
                 break;
 
+            case "togglereward":
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /spp togglereward <ID>");
+                    return true;
+                }
+                String targetId = args[1];
+                FileConfiguration rCfg = plugin.getPointManager().getPointConfig(targetId);
+                if (rCfg == null) {
+                    sender.sendMessage("§cそのIDは存在しません。");
+                    return true;
+                }
+
+                // 現在の状態を反転 (デフォルトは true)
+                boolean currentRewardState = rCfg.getBoolean("_settings.reward_enabled", true);
+                boolean nextRewardState = !currentRewardState;
+
+                rCfg.set("_settings.reward_enabled", nextRewardState);
+                plugin.getPointManager().savePointConfig(targetId);
+
+                String rDisp = plugin.getPointManager().getDisplayName(targetId);
+                sender.sendMessage("§a" + rDisp + " §fの報酬画面を " + (nextRewardState ? "§2有効" : "§4無効") + " §fにしました。");
+                break;
+
             default:
                 sendHelp(sender);
                 break;
@@ -217,6 +240,7 @@ public class SPPCommand implements CommandExecutor {
         sender.sendMessage(" §e§l▶ §fシステム設定");
         sender.sendMessage("  §f/spp §fsetreq §7<ID> <Slot> <pt> - 解放条件設定");
         sender.sendMessage("  §f/spp §ftoggleranking §7<ID> - ランキング有効化切替");
+        sender.sendMessage("  §f/spp §ftoggleranking §7<ID> - 報酬受け取り有効化切替");
         sender.sendMessage("  §f/spp §fcreateteam §7<チーム名> - チームデータ作成");
         sender.sendMessage("  §f/spp §freload §7- コンフィグリロード");
         sender.sendMessage("");

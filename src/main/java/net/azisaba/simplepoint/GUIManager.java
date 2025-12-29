@@ -3,6 +3,7 @@ package net.azisaba.simplepoint;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -19,7 +20,6 @@ import java.util.*;
 public class GUIManager implements Listener {
     private final SimplePointPlugin plugin;
     private final Map<UUID, SettingSession> sessions = new HashMap<>();
-    // ✨ 現在どのプレイヤーがどのポイントIDのGUIを開いているかを追跡
     private final Map<UUID, String> activeGuiId = new HashMap<>();
 
     public GUIManager(SimplePointPlugin plugin) {
@@ -36,7 +36,6 @@ public class GUIManager implements Listener {
         String title = displayName + (isAdmin ? "§r:編集" : "§r:受け取り");
         Inventory gui = Bukkit.createInventory(null, 54, title);
 
-        // ✨ 追跡用マップに保存（タイトル文字列に頼らずにIDを特定するため）
         activeGuiId.put(player.getUniqueId(), pointName);
 
         FileConfiguration config = plugin.getRewardManager().getRewardConfig(pointName);
@@ -99,8 +98,6 @@ public class GUIManager implements Listener {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
         String title = event.getView().getTitle();
-
-        // ✨ メモリから開いているポイントIDを取得
         String pId = activeGuiId.get(player.getUniqueId());
 
         if (title.contains(":受け取り")) {
@@ -110,7 +107,6 @@ public class GUIManager implements Listener {
         else if (title.contains(":編集")) {
             if (event.getRawSlot() < 0 || event.getRawSlot() >= 54) return;
             event.setCancelled(true);
-
             if (pId == null) return;
 
             ItemStack cursor = event.getCursor();
@@ -130,7 +126,6 @@ public class GUIManager implements Listener {
         }
     }
 
-    // ✨ インベントリを閉じたら追跡を解除
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         activeGuiId.remove(event.getPlayer().getUniqueId());
@@ -204,7 +199,6 @@ public class GUIManager implements Listener {
             plugin.getRewardManager().saveReward(s.pointName, s.slot, s.item, s.price, s.stock, s.isPersonal);
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
             player.closeInventory();
-            // activeGuiId は InventoryCloseEvent で自動削除される
             return;
         }
         openSettingGUI(player);
@@ -241,6 +235,12 @@ public class GUIManager implements Listener {
         int balance = plugin.getPointManager().getPoint(pointName, player.getUniqueId());
 
         if (balance >= price) {
+            // ✨ ログ用にアイテム名を取得
+            ItemStack rewardItem = config.getItemStack(slot + ".item");
+            String itemName = (rewardItem != null && rewardItem.hasItemMeta() && rewardItem.getItemMeta().hasDisplayName())
+                    ? rewardItem.getItemMeta().getDisplayName()
+                    : (rewardItem != null ? rewardItem.getType().toString() : "Unknown Item");
+
             if (isPersonal) {
                 addPersonalBoughtCount(player, pointName, slot);
             } else if (stock > 0) {
@@ -248,7 +248,10 @@ public class GUIManager implements Listener {
             }
 
             plugin.getPointManager().addPoint(pointName, player.getUniqueId(), -price);
-            player.getInventory().addItem(config.getItemStack(slot + ".item").clone());
+            if (rewardItem != null) player.getInventory().addItem(rewardItem.clone());
+
+            // ✨ 購入ログの記録
+            plugin.getLogManager().logRewardPurchase(player.getName(), pointName, itemName, price);
 
             player.sendMessage("§a購入完了！");
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);

@@ -81,6 +81,10 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 p.sendMessage("§c現在、" + displayName + " §cの報酬ショップは利用できません。");
                 return true;
             }
+            if (!cfg.getBoolean("_settings.reward_enabled", true)) {
+                p.sendMessage("§c現在、" + displayName + " §cの報酬ショップは閉鎖されています。");
+                return true;
+            }
             // 内部IDを使ってGUIを開く
             plugin.getGuiManager().openRewardGUI(p, pointId, false);
             return true;

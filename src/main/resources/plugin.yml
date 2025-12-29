@@ -1,5 +1,5 @@
 name: SimplePointPlugin
-version: 1.0
+version: 1.0.0
 main: net.azisaba.simplepoint.SimplePointPlugin
 api-version: 1.16
 author: pino223
@@ -11,3 +11,4 @@ commands:
     description: SimplePointPlugin Player Command
   sptt:
     description: チーム用コマンド
+    permission: sptt.admin

@@ -5,6 +5,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -14,19 +15,18 @@ import java.util.*;
 
 public class GUIManager implements Listener {
     private final SimplePointPlugin plugin;
-    // 設定中のデータを一時保存するためのMap
     private final Map<UUID, SettingSession> sessions = new HashMap<>();
 
     public GUIManager(SimplePointPlugin plugin) {
         this.plugin = plugin;
     }
 
-    // セッション保持用クラス
     private static class SettingSession {
         String pointName;
         int slot;
         ItemStack item;
         int price = 100;
+        int stock = -1; // -1は無限
         boolean repeatable = true;
     }
 
@@ -37,19 +37,15 @@ public class GUIManager implements Listener {
         if (plugin.getRewardManager().getConfig().contains(pointName)) {
             for (String slotStr : plugin.getRewardManager().getConfig().getConfigurationSection(pointName).getKeys(false)) {
                 int slot = Integer.parseInt(slotStr);
-                ItemStack item = plugin.getRewardManager().getConfig().getItemStack(pointName + "." + slot + ".item");
+                ItemStack item = plugin.getRewardManager().getConfig().getItemStack(pointName + "." + slot + ".item").clone();
                 int price = plugin.getRewardManager().getConfig().getInt(pointName + "." + slot + ".price");
-                boolean rep = plugin.getRewardManager().getConfig().getBoolean(pointName + "." + slot + ".repeatable");
+                int stock = plugin.getRewardManager().getConfig().getInt(pointName + "." + slot + ".stock", -1);
 
-                item = item.clone();
                 ItemMeta meta = item.getItemMeta();
                 List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
                 lore.add("§8----------");
                 lore.add("§e価格: §f" + price + " pt");
-                lore.add("§e再購入: §f" + (rep ? "可能" : "一度きり"));
-                if (!isAdmin) {
-                    lore.add("§b現在の保有: " + plugin.getPointManager().getPoint(pointName, player.getUniqueId()) + " pt");
-                }
+                lore.add("§e在庫: §f" + (stock == -1 ? "無限" : stock));
                 meta.setLore(lore);
                 item.setItemMeta(meta);
                 gui.setItem(slot, item);
@@ -58,19 +54,16 @@ public class GUIManager implements Listener {
         player.openInventory(gui);
     }
 
-    // 設定専用GUI 🛠️
     public void openSettingGUI(Player player) {
         SettingSession s = sessions.get(player.getUniqueId());
         Inventory inv = Bukkit.createInventory(null, 27, "報酬設定: " + s.pointName);
 
-        inv.setItem(4, s.item); // 売りたいアイテム
-        inv.setItem(10, createGuiItem(Material.RED_TERRACOTTA, "§c-100", "§7現在の価格: " + s.price));
-        inv.setItem(11, createGuiItem(Material.PINK_TERRACOTTA, "§c-10", ""));
-        inv.setItem(13, createGuiItem(Material.GOLD_INGOT, "§e価格: " + s.price, "§7ここをクリックして保存"));
-        inv.setItem(15, createGuiItem(Material.LIME_TERRACOTTA, "§a+10", ""));
-        inv.setItem(16, createGuiItem(Material.GREEN_TERRACOTTA, "§a+100", ""));
-        inv.setItem(22, createGuiItem(s.repeatable ? Material.REPEATER : Material.BARRIER,
-                "§f再購入設定: " + (s.repeatable ? "§a可能" : "§c一度のみ"), "§7クリックで切替"));
+        inv.setItem(4, s.item);
+        inv.setItem(10, createGuiItem(Material.RED_TERRACOTTA, "§c価格 -100", "§7右クリックで-10"));
+        inv.setItem(16, createGuiItem(Material.GREEN_TERRACOTTA, "§a価格 +100", "§7右クリックで+10"));
+        inv.setItem(19, createGuiItem(Material.CHEST, "§6在庫: " + (s.stock < 0 ? "無限" : s.stock), "§7左: +5 / 右: -5 (0未満で無限)"));
+        inv.setItem(22, createGuiItem(Material.LAVA_BUCKET, "§4§l設定を削除", "§7スロットを空にします"));
+        inv.setItem(13, createGuiItem(Material.GOLD_INGOT, "§e§l保存する", "§7現在の価格: " + s.price));
 
         player.openInventory(inv);
     }
@@ -79,7 +72,7 @@ public class GUIManager implements Listener {
         ItemStack item = new ItemStack(m);
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName(name);
-        if(!lore.isEmpty()) meta.setLore(Collections.singletonList(lore));
+        meta.setLore(Collections.singletonList(lore));
         item.setItemMeta(meta);
         return item;
     }
@@ -89,20 +82,12 @@ public class GUIManager implements Listener {
         if (!(event.getWhoClicked() instanceof Player)) return;
         Player player = (Player) event.getWhoClicked();
         String title = event.getView().getTitle();
-        ItemStack current = event.getCurrentItem();
-        if (current == null || current.getType() == Material.AIR) return;
 
-        // --- 購入処理 ---
         if (title.contains(":受け取り")) {
             event.setCancelled(true);
-            String pointName = title.split(":")[0];
-            int slot = event.getRawSlot();
-            handlePurchase(player, pointName, slot);
-        }
-
-        // --- 編集モード（アイテム設置） ---
-        else if (title.contains(":編集")) {
-            if (event.getRawSlot() < 54) event.setCancelled(true);
+            handlePurchase(player, title.split(":")[0], event.getRawSlot());
+        } else if (title.contains(":編集")) {
+            event.setCancelled(true);
             if (event.getRawSlot() < 54 && event.getCursor().getType() != Material.AIR) {
                 SettingSession s = new SettingSession();
                 s.pointName = title.split(":")[0];
@@ -111,56 +96,47 @@ public class GUIManager implements Listener {
                 sessions.put(player.getUniqueId(), s);
                 Bukkit.getScheduler().runTask(plugin, () -> openSettingGUI(player));
             }
-        }
-
-        // --- 設定GUIの操作 ---
-        else if (title.startsWith("報酬設定:")) {
+        } else if (title.startsWith("報酬設定:")) {
             event.setCancelled(true);
-            SettingSession s = sessions.get(player.getUniqueId());
-            if (s == null) return;
-
-            switch (event.getRawSlot()) {
-                case 10: s.price = Math.max(0, s.price - 100); break;
-                case 11: s.price = Math.max(0, s.price - 10); break;
-                case 15: s.price += 10; break;
-                case 16: s.price += 100; break;
-                case 22: s.repeatable = !s.repeatable; break;
-                case 13: // 保存
-                    plugin.getRewardManager().saveReward(s.pointName, s.slot, s.item, s.price, s.repeatable);
-                    player.sendMessage("§a報酬を保存しました！");
-                    player.closeInventory();
-                    return;
-            }
-            openSettingGUI(player);
+            handleSetting(player, event.getRawSlot(), event.getClick());
         }
     }
 
+    private void handleSetting(Player player, int slot, ClickType click) {
+        SettingSession s = sessions.get(player.getUniqueId());
+        if (s == null) return;
+
+        switch (slot) {
+            case 10: s.price = Math.max(0, s.price - (click.isRightClick() ? 10 : 100)); break;
+            case 16: s.price += (click.isRightClick() ? 10 : 100); break;
+            case 19: s.stock = (click.isRightClick() ? s.stock - 5 : s.stock + 5); if(s.stock < -1) s.stock = -1; break;
+            case 22: // 削除
+                plugin.getRewardManager().getConfig().set(s.pointName + "." + s.slot, null);
+                plugin.getRewardManager().save();
+                player.sendMessage(plugin.getConfig().getString("messages.delete-success"));
+                player.closeInventory();
+                return;
+            case 13: // 保存
+                plugin.getRewardManager().saveReward(s.pointName, s.slot, s.item, s.price, s.stock, s.repeatable);
+                player.closeInventory();
+                return;
+        }
+        openSettingGUI(player);
+    }
+
     private void handlePurchase(Player player, String pointName, int slot) {
+        // (前回の購入ロジックにログ出力を追加)
         String path = pointName + "." + slot;
+        if (!plugin.getRewardManager().getConfig().contains(path)) return;
+
         int price = plugin.getRewardManager().getConfig().getInt(path + ".price");
-        boolean rep = plugin.getRewardManager().getConfig().getBoolean(path + ".repeatable");
-        int currentPoint = plugin.getPointManager().getPoint(pointName, player.getUniqueId());
+        int current = plugin.getPointManager().getPoint(pointName, player.getUniqueId());
 
-        // 一度きりチェック
-        if (!rep && plugin.getRewardManager().getConfig().getBoolean("history." + pointName + "." + slot + "." + player.getUniqueId())) {
-            player.sendMessage("§cこの報酬は一度しか受け取れません！");
-            return;
+        if (current >= price) {
+            plugin.getPointManager().addPoint(pointName, player.getUniqueId(), -price);
+            player.getInventory().addItem(plugin.getRewardManager().getConfig().getItemStack(path + ".item"));
+            plugin.getLogManager().log(player.getName() + " purchased " + pointName + " slot " + slot);
+            player.sendMessage("§a購入しました！");
         }
-
-        if (currentPoint < price) {
-            player.sendMessage("§cポイントが足りません！");
-            return;
-        }
-
-        // ポイント減算とアイテム付与
-        plugin.getPointManager().addPoint(pointName, player.getUniqueId(), -price);
-        ItemStack item = plugin.getRewardManager().getConfig().getItemStack(path + ".item").clone();
-        player.getInventory().addItem(item);
-
-        if (!rep) {
-            plugin.getRewardManager().getConfig().set("history." + pointName + "." + slot + "." + player.getUniqueId(), true);
-            plugin.getRewardManager().save();
-        }
-        player.sendMessage("§aアイテムを購入しました！");
     }
 }

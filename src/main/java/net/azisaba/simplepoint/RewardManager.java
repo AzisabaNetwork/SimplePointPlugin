@@ -5,8 +5,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 public class RewardManager {
     private final SimplePointPlugin plugin;
@@ -22,11 +20,12 @@ public class RewardManager {
         this.config = YamlConfiguration.loadConfiguration(file);
     }
 
-    // 報酬を保存するよ！ 📦
-    public void saveReward(String pointName, int slot, ItemStack item, int price, boolean repeatable) {
+    // 引数にstockを追加してエラーを解消！ ✨
+    public void saveReward(String pointName, int slot, ItemStack item, int price, int stock, boolean repeatable) {
         String path = pointName + "." + slot;
         config.set(path + ".item", item);
         config.set(path + ".price", price);
+        config.set(path + ".stock", stock);
         config.set(path + ".repeatable", repeatable);
         save();
     }

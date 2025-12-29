@@ -1,0 +1,9 @@
+messages:
+  prefix: "§e[SimplePoint] "
+  no-points: "§cポイントが足りません！"
+  purchase-success: "§a購入完了！残りポイント: {point}pt"
+  once-only: "§cこの報酬は一度しか受け取れません。"
+  out-of-stock: "§c在庫切れです！"
+  delete-success: "§c報酬を削除しました。"
+  team-created: "§bチーム「{team}」を結成しました！"
+  team-donated: "§aチームに {amount}pt 貢献しました！"

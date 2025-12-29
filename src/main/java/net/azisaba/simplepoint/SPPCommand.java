@@ -161,22 +161,23 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("§6§lSimplePoint 管理ヘルプ");
-        sender.sendMessage("§f/spp create <名> §7- ポイント作成");
+        sender.sendMessage("§a/spp create <名> §7- ポイント作成");
         sender.sendMessage("§f/spp createteam <名> §7- チーム作成");
-        sender.sendMessage("§f/spp add/remove/set <人> <名> <数> §7- プレイヤーのポイント操作");
-        sender.sendMessage("§f/spp score <名> <人> §7- 個人ポイント確認");
-        sender.sendMessage("§f/spp rewardgui <名> §7- 報酬編集");
+        sender.sendMessage("§a/spp add/remove/set <人> <名> <数> §7- プレイヤーのポイント操作");
+        sender.sendMessage("§a/spp score <名> <人> §7- 個人ポイント確認");
+        sender.sendMessage("§a/spp rewardgui <名> §7- 報酬編集");
         sender.sendMessage("§f/spp teamrewardgui <チーム> §7- チーム報酬編集");
-        sender.sendMessage("§f/spp setreq <名> <スロット> <pt> §7- 解放条件設定");
-        sender.sendMessage("§f/spp ranking <名> §7- ランキング表示");
+        sender.sendMessage("§f/spp setreq <名> <スロット> <pt> §7- 解放に必要なポイント数設定");
+        sender.sendMessage("§a/spp ranking <名> §7- ランキング表示");
         sender.sendMessage("§f/spp toggleranking <名> §7- ショップ/ランキングの有効化切替");
+        sender.sendMessage("§f/spp help §7- このヘルプを表示");
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
-            StringUtil.copyPartialMatches(args[0], Arrays.asList("create", "add", "set","remove", "rewardgui", "teamrewardgui", "createteam", "setreq", "ranking", "reload", "score", "toggleranking"), completions);
+            StringUtil.copyPartialMatches(args[0], Arrays.asList("help","create", "add", "set","remove", "rewardgui", "teamrewardgui", "createteam", "setreq", "ranking", "reload", "score", "toggleranking"), completions);
         } else if (args.length == 2) {
             if (Arrays.asList("add", "set").contains(args[0].toLowerCase())) {
                 List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());

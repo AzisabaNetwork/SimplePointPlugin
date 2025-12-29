@@ -31,6 +31,7 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
             p.sendMessage("§e/spt myp <ポイント名> §7- 所持・累計ポイントを確認");
             p.sendMessage("§e/spt reward <ポイント名> §7- 報酬ショップを開く");
             p.sendMessage("§e/spt ranking <ポイント名> §7- 上位7名のランキングを確認");
+            p.sendMessage("§e/spt help §7- このヘルプを表示");
             p.sendMessage("§8§m----------------------------");
             return true;
         }

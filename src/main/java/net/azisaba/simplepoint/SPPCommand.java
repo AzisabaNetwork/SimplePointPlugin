@@ -40,34 +40,37 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
                 break;
 
             case "add":
+            case "remove":
             case "set":
                 if (args.length < 4) return false;
+
                 OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
                 String pointName = args[2];
-                int amount = Integer.parseInt(args[3]);
-                if (sub.equals("add")) {
-                    plugin.getPointManager().addPoint(pointName, target.getUniqueId(), amount);
-                    sender.sendMessage("§a" + target.getName() + " に " + amount + " pt 追加しました。");
-                } else {
-                    plugin.getPointManager().setPoint(pointName, target.getUniqueId(), amount);
-                    sender.sendMessage("§a" + target.getName() + " のポイントを " + amount + " pt に設定しました。");
-                }
-                break;
+                int amount;
 
-            case "remove":
-                if (args.length < 4) return false;
-                OfflinePlayer targetRem = Bukkit.getOfflinePlayer(args[1]);
-                String pNameRem = args[2];
-                int amountRem;
                 try {
-                    amountRem = Integer.parseInt(args[3]);
+                    amount = Integer.parseInt(args[3]);
                 } catch (NumberFormatException e) {
                     sender.sendMessage("§c数値は整数で入力してください。");
                     return true;
                 }
-                // 指定したポイントを減らす
-                plugin.getPointManager().addPoint(pNameRem, targetRem.getUniqueId(), -amountRem);
-                sender.sendMessage("§a" + targetRem.getName() + " から " + amountRem + " pt 差し引きました。");
+
+                if (sub.equals("add")) {
+                    plugin.getPointManager().addPoint(pointName, target.getUniqueId(), amount);
+                    sender.sendMessage("§a" + target.getName() + " に " + amount + " pt 追加しました。");
+                    plugin.getLogManager().logPointChange(target.getName(), pointName, amount, "ADD");
+                }
+                else if (sub.equals("remove")) {
+                    // 数値をマイナスにして加算処理
+                    plugin.getPointManager().addPoint(pointName, target.getUniqueId(), -amount);
+                    sender.sendMessage("§a" + target.getName() + " から " + amount + " pt 差し引きました。");
+                    plugin.getLogManager().logPointChange(target.getName(), pointName, -amount, "REMOVE");
+                }
+                else if (sub.equals("set")) {
+                    plugin.getPointManager().setPoint(pointName, target.getUniqueId(), amount);
+                    sender.sendMessage("§a" + target.getName() + " のポイントを " + amount + " pt に設定しました。");
+                    plugin.getLogManager().logPointChange(target.getName(), pointName, amount, "SET");
+                }
                 break;
 
             case "rewardgui":
@@ -144,6 +147,7 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("§cランキングは現在無効です。");
             return;
         }
+
         Map<String, Integer> scores = new HashMap<>();
         for (String key : config.getKeys(false)) {
             if (key.startsWith("_")) continue;
@@ -151,12 +155,24 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
             OfflinePlayer op = Bukkit.getOfflinePlayer(UUID.fromString(key));
             if (op.getName() != null) scores.put(op.getName(), total);
         }
+
         List<Map.Entry<String, Integer>> list = new ArrayList<>(scores.entrySet());
         list.sort((a, b) -> b.getValue().compareTo(a.getValue()));
-        sender.sendMessage("§e--- " + pointName + " 累計ランキング ---");
-        for (int i = 0; i < Math.min(list.size(), 10); i++) {
-            sender.sendMessage("§7" + (i + 1) + ". §f" + list.get(i).getKey() + ": §b" + list.get(i).getValue() + " pt");
+
+        // --- 全体放送用のメッセージ構築 ---
+        String header = "§8§l[§6§lRanking§8§l] §e§l" + pointName.toUpperCase();
+        Bukkit.broadcastMessage("§7§m--------------------------------------");
+        Bukkit.broadcastMessage(header);
+
+        for (int i = 0; i < Math.min(list.size(), 7); i++) {
+            String color = (i == 0) ? "§e§l" : (i == 1) ? "§f§l" : (i == 2) ? "§6§l" : "§7";
+            String name = list.get(i).getKey();
+            int score = list.get(i).getValue();
+
+            Bukkit.broadcastMessage(color + (i + 1) + ". §r" + name + " §7- §b" + score + " pt");
         }
+        Bukkit.broadcastMessage("§7§m--------------------------------------");
+
     }
 
     private void sendHelp(CommandSender sender) {
@@ -179,7 +195,7 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             StringUtil.copyPartialMatches(args[0], Arrays.asList("help","create", "add", "set","remove", "rewardgui", "teamrewardgui", "createteam", "setreq", "ranking", "reload", "score", "toggleranking"), completions);
         } else if (args.length == 2) {
-            if (Arrays.asList("add", "set").contains(args[0].toLowerCase())) {
+            if (Arrays.asList("add", "set","remove").contains(args[0].toLowerCase())) {
                 List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());
                 StringUtil.copyPartialMatches(args[1], names, completions);
             } else if (Arrays.asList("rewardgui", "ranking", "toggleranking", "score", "setreq").contains(args[0].toLowerCase())) {
@@ -187,7 +203,7 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
             } else if (args[0].equalsIgnoreCase("teamrewardgui")) {
                 StringUtil.copyPartialMatches(args[1], new ArrayList<>(plugin.getTeamManager().getTeamNames()), completions);
             }
-        } else if (args.length == 3 && Arrays.asList("add", "set").contains(args[0].toLowerCase())) {
+        } else if (args.length == 3 && Arrays.asList("add", "set","remove").contains(args[0].toLowerCase())) {
             StringUtil.copyPartialMatches(args[2], plugin.getPointManager().getPointNames(), completions);
         }
         return completions;

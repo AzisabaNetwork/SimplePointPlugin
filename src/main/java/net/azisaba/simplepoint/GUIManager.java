@@ -61,19 +61,37 @@ public class GUIManager implements Listener {
         String title = event.getView().getTitle();
 
         if (title.contains(":受け取り")) {
-            event.setCancelled(true);
+            event.setCancelled(true); // 購入用GUIは固定
             handlePurchase(player, title.split(":")[0], event.getRawSlot());
-        } else if (title.contains(":編集")) {
-            event.setCancelled(true);
+        }
+        else if (title.contains(":編集")) {
+            // インベントリ外のクリックは無視
+            if (event.getRawSlot() < 0) return;
+
+            // 自分の持ち物スロットをクリックした場合はキャンセルしない（アイテムを上に持っていけるようにするため）
             if (event.getRawSlot() >= 54) return;
+
+            // 編集用GUIのメインエリア
+            event.setCancelled(true); // デフォルトではキャンセル
+
             String pName = title.split(":")[0];
-            ItemStack item = (event.getCursor() != null && event.getCursor().getType() != Material.AIR) ?
-                    event.getCursor().clone() : (event.getCurrentItem() != null ? event.getCurrentItem().clone() : null);
-            if (item != null) {
-                if (event.getCursor() != null) player.setItemOnCursor(null);
-                startSetting(player, pName, event.getRawSlot(), item);
+            ItemStack cursor = event.getCursor();
+            ItemStack clicked = event.getCurrentItem();
+
+            // 1. 手にアイテムを持って空のスロット、または既存アイテムをクリックした時（設置/上書き）
+            if (cursor != null && cursor.getType() != Material.AIR) {
+                ItemStack itemToSave = cursor.clone();
+                // 設置した瞬間に設定画面へ
+                startSetting(player, pName, event.getRawSlot(), itemToSave);
+                // 手元のアイテムを消す（設置した演出）
+                player.setItemOnCursor(null);
             }
-        } else if (title.startsWith("報酬設定:")) {
+            // 2. 何も持たずに既存のアイテムをクリックした時（再編集）
+            else if (clicked != null && clicked.getType() != Material.AIR) {
+                startSetting(player, pName, event.getRawSlot(), clicked.clone());
+            }
+        }
+        else if (title.startsWith("報酬設定:")) {
             event.setCancelled(true);
             handleSetting(player, event.getRawSlot(), event.getClick());
         }

@@ -8,86 +8,83 @@ import java.util.*;
 
 public class PointManager {
     private final SimplePointPlugin plugin;
-    private final File dataFolder;
+    private final File pointFolder;
+    private final Map<String, FileConfiguration> configCache = new HashMap<>();
 
     public PointManager(SimplePointPlugin plugin) {
         this.plugin = plugin;
-        this.dataFolder = new File(plugin.getDataFolder(), "playerpointdata");
-        if (!dataFolder.exists()) dataFolder.mkdirs();
+        this.pointFolder = new File(plugin.getDataFolder(), "points");
+        if (!pointFolder.exists()) pointFolder.mkdirs();
+    }
+
+    public void reload() {
+        configCache.clear();
     }
 
     public boolean createPointType(String name) {
-        File file = new File(dataFolder, name + ".yml");
+        File file = new File(pointFolder, name + ".yml");
         if (file.exists()) return false;
         try {
             file.createNewFile();
-            FileConfiguration config = YamlConfiguration.loadConfiguration(file);
-            config.set("_settings.enabled", true);
-            config.set("_settings.ranking_enabled", true);
-            config.save(file);
+            FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+            cfg.set("_settings.ranking_enabled", true);
+            cfg.save(file);
             return true;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
+        } catch (IOException e) { return false; }
     }
 
-    public FileConfiguration getPointConfig(String pointName) {
-        File file = new File(dataFolder, pointName + ".yml");
+    public FileConfiguration getPointConfig(String name) {
+        if (configCache.containsKey(name)) return configCache.get(name);
+        File file = new File(pointFolder, name + ".yml");
         if (!file.exists()) return null;
-        return YamlConfiguration.loadConfiguration(file);
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        configCache.put(name, cfg);
+        return cfg;
     }
 
-    public void saveConfig(String pointName, FileConfiguration config) {
-        try { config.save(new File(dataFolder, pointName + ".yml")); } catch (IOException e) { e.printStackTrace(); }
+    public void saveConfig(String name, FileConfiguration cfg) {
+        try {
+            cfg.save(new File(pointFolder, name + ".yml"));
+            configCache.put(name, cfg);
+        } catch (IOException e) { e.printStackTrace(); }
     }
 
-    // 現在の所持ポイントを取得
-    public int getPoint(String pointName, UUID uuid) {
-        FileConfiguration config = getPointConfig(pointName);
-        return (config != null) ? config.getInt(uuid.toString() + ".current", 0) : 0;
+    public int getPoint(String name, UUID uuid) {
+        FileConfiguration cfg = getPointConfig(name);
+        return cfg != null ? cfg.getInt(uuid.toString() + ".current", 0) : 0;
     }
 
-    // 累計ポイントを取得
-    public int getTotalPoint(String pointName, UUID uuid) {
-        FileConfiguration config = getPointConfig(pointName);
-        return (config != null) ? config.getInt(uuid.toString() + ".total", 0) : 0;
+    public int getTotalPoint(String name, UUID uuid) {
+        FileConfiguration cfg = getPointConfig(name);
+        return cfg != null ? cfg.getInt(uuid.toString() + ".total", 0) : 0;
     }
 
-    public void addPoint(String pointName, UUID uuid, int amount) {
-        FileConfiguration config = getPointConfig(pointName);
-        if (config == null) return;
+    public void addPoint(String name, UUID uuid, int amount) {
+        FileConfiguration cfg = getPointConfig(name);
+        if (cfg == null) return;
 
-        int current = config.getInt(uuid.toString() + ".current", 0);
-        int total = config.getInt(uuid.toString() + ".total", 0);
+        int current = cfg.getInt(uuid.toString() + ".current", 0);
+        int total = cfg.getInt(uuid.toString() + ".total", 0);
 
-        config.set(uuid.toString() + ".current", Math.max(0, current + amount));
-
-        // ポイントが増える時だけ累計とチーム貢献に加算 📈
+        cfg.set(uuid.toString() + ".current", current + amount);
         if (amount > 0) {
-            config.set(uuid.toString() + ".total", total + amount);
-            String teamName = plugin.getTeamManager().getPlayerTeam(uuid);
-            if (teamName != null) {
-                plugin.getTeamManager().addContribution(teamName, uuid, amount);
-            }
+            cfg.set(uuid.toString() + ".total", total + amount);
         }
-        saveConfig(pointName, config);
+        saveConfig(name, cfg);
     }
 
-    public void setPoint(String pointName, UUID uuid, int amount) {
-        FileConfiguration config = getPointConfig(pointName);
-        if (config == null) return;
-        config.set(uuid.toString() + ".current", Math.max(0, amount));
-        saveConfig(pointName, config);
+    public void setPoint(String name, UUID uuid, int amount) {
+        FileConfiguration cfg = getPointConfig(name);
+        if (cfg == null) return;
+        cfg.set(uuid.toString() + ".current", amount);
+        saveConfig(name, cfg);
     }
 
     public List<String> getPointNames() {
+        File[] files = pointFolder.listFiles((dir, name) -> name.endsWith(".yml"));
         List<String> names = new ArrayList<>();
-        File[] files = dataFolder.listFiles();
         if (files != null) {
-            for (File f : files) {
-                if (f.getName().endsWith(".yml")) names.add(f.getName().replace(".yml", ""));
-            }
+            for (File f : files) names.add(f.getName().replace(".yml", ""));
         }
         return names;
     }

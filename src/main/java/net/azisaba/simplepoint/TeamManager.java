@@ -1,6 +1,5 @@
 package net.azisaba.simplepoint;
 
-import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
@@ -9,91 +8,81 @@ import java.util.*;
 
 public class TeamManager {
     private final SimplePointPlugin plugin;
-    private final File file;
-    private FileConfiguration config;
+    private final File teamFile;
+    private FileConfiguration teamConfig;
+    private final Map<String, Set<UUID>> teams = new HashMap<>();
 
     public TeamManager(SimplePointPlugin plugin) {
         this.plugin = plugin;
-        this.file = new File(plugin.getDataFolder(), "teams.yml");
-        if (!file.exists()) {
-            try { file.createNewFile(); } catch (IOException e) { e.printStackTrace(); }
+        this.teamFile = new File(plugin.getDataFolder(), "teams.yml");
+        loadTeams();
+    }
+
+    public void loadTeams() {
+        if (!teamFile.exists()) {
+            try { teamFile.createNewFile(); } catch (IOException e) { e.printStackTrace(); }
         }
-        this.config = YamlConfiguration.loadConfiguration(file);
+        teamConfig = YamlConfiguration.loadConfiguration(teamFile);
+        teams.clear();
+        for (String teamName : teamConfig.getKeys(false)) {
+            List<String> uuids = teamConfig.getStringList(teamName + ".members");
+            Set<UUID> memberSet = new HashSet<>();
+            for (String s : uuids) memberSet.add(UUID.fromString(s));
+            teams.put(teamName, memberSet);
+        }
     }
 
-    // 追加: チーム名のリストを取得
-    public Set<String> getTeamNames() {
-        if (!config.contains("teams")) return new HashSet<>();
-        return config.getConfigurationSection("teams").getKeys(false);
+    public void createTeam(String name) {
+        if (!teams.containsKey(name)) {
+            teams.put(name, new HashSet<>());
+            saveTeams();
+        }
     }
 
-    public void createTeam(String teamName) {
-        config.set("teams." + teamName + ".points", 0);
-        config.set("teams." + teamName + ".members", new ArrayList<String>());
-        save();
+    public Set<String> getTeamNames() { return teams.keySet(); }
+
+    public int getMemberCount(String teamName) {
+        return teams.containsKey(teamName) ? teams.get(teamName).size() : 0;
     }
 
     public String joinRandomTeam(UUID uuid) {
-        if (getPlayerTeam(uuid) != null) return "already_joined";
-        if (!config.contains("teams")) return "no_teams";
-        String bestTeam = null;
-        int minMembers = Integer.MAX_VALUE;
-        for (String teamName : getTeamNames()) {
-            int count = getMemberCount(teamName);
-            if (count < minMembers) {
-                minMembers = count;
-                bestTeam = teamName;
-            }
-        }
+        String bestTeam = teams.keySet().stream()
+                .min(Comparator.comparingInt(this::getMemberCount))
+                .orElse(null);
         if (bestTeam != null) {
-            List<String> members = config.getStringList("teams." + bestTeam + ".members");
-            members.add(uuid.toString());
-            config.set("teams." + bestTeam + ".members", members);
-            save();
+            teams.get(bestTeam).add(uuid);
+            saveTeams();
+            return bestTeam;
         }
-        return bestTeam;
-    }
-
-    public String getPlayerTeam(UUID uuid) {
-        for (String teamName : getTeamNames()) {
-            if (config.getStringList("teams." + teamName + ".members").contains(uuid.toString())) return teamName;
-        }
-        return null;
-    }
-
-    public int getMemberCount(String teamName) {
-        return config.getStringList("teams." + teamName + ".members").size();
+        return "No Teams Available";
     }
 
     public int getTeamPoints(String teamName) {
-        return config.getInt("teams." + teamName + ".points", 0);
-    }
-
-    public void addTeamPoints(String teamName, int amount) {
-        config.set("teams." + teamName + ".points", getTeamPoints(teamName) + amount);
-        save();
-    }
-
-    public void addContribution(String teamName, UUID uuid, int amount) {
-        int current = config.getInt("teams." + teamName + ".contrib." + uuid.toString(), 0);
-        config.set("teams." + teamName + ".contrib." + uuid.toString(), current + amount);
-        addTeamPoints(teamName, amount);
-        save();
+        if (!teams.containsKey(teamName)) return 0;
+        int total = 0;
+        for (UUID uuid : teams.get(teamName)) {
+            // ポイント取得ロジック (PointManager経由)
+            total += plugin.getPointManager().getPoint(teamName, uuid);
+        }
+        return total;
     }
 
     public Map<String, Integer> getContributionRanking(String teamName) {
         Map<String, Integer> ranking = new HashMap<>();
-        String path = "teams." + teamName + ".contrib";
-        if (config.contains(path)) {
-            for (String uuidStr : config.getConfigurationSection(path).getKeys(false)) {
-                String name = Bukkit.getOfflinePlayer(UUID.fromString(uuidStr)).getName();
-                ranking.put(name != null ? name : "Unknown", config.getInt(path + "." + uuidStr));
-            }
+        if (!teams.containsKey(teamName)) return ranking;
+        for (UUID uuid : teams.get(teamName)) {
+            ranking.put(org.bukkit.Bukkit.getOfflinePlayer(uuid).getName(),
+                    plugin.getPointManager().getPoint(teamName, uuid));
         }
         return ranking;
     }
 
-    public void save() {
-        try { config.save(file); } catch (IOException e) { e.printStackTrace(); }
+    private void saveTeams() {
+        for (Map.Entry<String, Set<UUID>> entry : teams.entrySet()) {
+            List<String> list = new ArrayList<>();
+            for (UUID u : entry.getValue()) list.add(u.toString());
+            teamConfig.set(entry.getKey() + ".members", list);
+        }
+        try { teamConfig.save(teamFile); } catch (IOException e) { e.printStackTrace(); }
     }
 }

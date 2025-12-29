@@ -54,6 +54,22 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
                 }
                 break;
 
+            case "remove":
+                if (args.length < 4) return false;
+                OfflinePlayer targetRem = Bukkit.getOfflinePlayer(args[1]);
+                String pNameRem = args[2];
+                int amountRem;
+                try {
+                    amountRem = Integer.parseInt(args[3]);
+                } catch (NumberFormatException e) {
+                    sender.sendMessage("§c数値は整数で入力してください。");
+                    return true;
+                }
+                // 指定したポイントを減らす
+                plugin.getPointManager().addPoint(pNameRem, targetRem.getUniqueId(), -amountRem);
+                sender.sendMessage("§a" + targetRem.getName() + " から " + amountRem + " pt 差し引きました。");
+                break;
+
             case "rewardgui":
                 if (!(sender instanceof Player)) return true;
                 if (args.length < 2) return false;
@@ -79,11 +95,12 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
                 int req = Integer.parseInt(args[3]);
                 FileConfiguration config = plugin.getRewardManager().getRewardConfig(pName);
                 config.set(slot + ".requirement", req);
+                // 既存のデータを維持して保存
                 plugin.getRewardManager().saveReward(pName, slot,
                         config.getItemStack(slot + ".item"),
                         config.getInt(slot + ".price", 100),
                         config.getInt(slot + ".stock", -1));
-                sender.sendMessage("§a" + pName + " の " + slot + " 番に解放条件 " + req + " pt を設定。");
+                sender.sendMessage("§a" + pName + " " + slot + "番に解放条件 " + req + " pt を設定しました。");
                 break;
 
             case "ranking":
@@ -124,7 +141,7 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
     private void showRanking(CommandSender sender, String pointName) {
         FileConfiguration config = plugin.getPointManager().getPointConfig(pointName);
         if (config == null || !config.getBoolean("_settings.ranking_enabled", true)) {
-            sender.sendMessage("§cランキングは無効です。");
+            sender.sendMessage("§cランキングは現在無効です。");
             return;
         }
         Map<String, Integer> scores = new HashMap<>();
@@ -144,14 +161,22 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage("§6§lSimplePoint 管理ヘルプ");
-        sender.sendMessage("§f/spp create/createteam/add/score/rewardgui/teamrewardgui/setreq/ranking/toggleranking/reload");
+        sender.sendMessage("§f/spp create <名> §7- ポイント作成");
+        sender.sendMessage("§f/spp createteam <名> §7- チーム作成");
+        sender.sendMessage("§f/spp add/remove/set <人> <名> <数> §7- プレイヤーのポイント操作");
+        sender.sendMessage("§f/spp score <名> <人> §7- 個人ポイント確認");
+        sender.sendMessage("§f/spp rewardgui <名> §7- 報酬編集");
+        sender.sendMessage("§f/spp teamrewardgui <チーム> §7- チーム報酬編集");
+        sender.sendMessage("§f/spp setreq <名> <スロット> <pt> §7- 解放条件設定");
+        sender.sendMessage("§f/spp ranking <名> §7- ランキング表示");
+        sender.sendMessage("§f/spp toggleranking <名> §7- ショップ/ランキングの有効化切替");
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
-            StringUtil.copyPartialMatches(args[0], Arrays.asList("create", "add", "set", "rewardgui", "teamrewardgui", "createteam", "setreq", "ranking", "reload", "score", "toggleranking"), completions);
+            StringUtil.copyPartialMatches(args[0], Arrays.asList("create", "add", "set","remove", "rewardgui", "teamrewardgui", "createteam", "setreq", "ranking", "reload", "score", "toggleranking"), completions);
         } else if (args.length == 2) {
             if (Arrays.asList("add", "set").contains(args[0].toLowerCase())) {
                 List<String> names = Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList());

@@ -1,15 +1,15 @@
 package net.azisaba.simplepoint;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class SPTCommand implements CommandExecutor, TabCompleter {
     private final SimplePointPlugin plugin;
@@ -30,6 +30,7 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
             p.sendMessage("§8§m----------§r §6§lSPT HELP §8§m----------");
             p.sendMessage("§e/spt myp <ポイント名> §7- 所持・累計ポイントを確認");
             p.sendMessage("§e/spt reward <ポイント名> §7- 報酬ショップを開く");
+            p.sendMessage("§e/spt ranking <ポイント名> §7- 上位7名のランキングを確認");
             p.sendMessage("§8§m----------------------------");
             return true;
         }
@@ -63,8 +64,12 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             String pointName = args[1];
-            // togglerankingで設定した「ショップ有効化」フラグをチェック
-            if (!plugin.getPointManager().getPointConfig(pointName).getBoolean("_settings.ranking_enabled", true)) {
+            FileConfiguration cfg = plugin.getPointManager().getPointConfig(pointName);
+            if (cfg == null) {
+                p.sendMessage("§cそのポイント名は存在しません。");
+                return true;
+            }
+            if (!cfg.getBoolean("_settings.ranking_enabled", true)) {
                 p.sendMessage("§c現在、この報酬ショップは利用できません。");
                 return true;
             }
@@ -72,15 +77,79 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        else if (sub.equals("ranking")) {
+            if (args.length < 2) {
+                p.sendMessage("§c使用法: /spt ranking <ポイント名>");
+                return true;
+            }
+            showPersonalRanking(p, args[1]);
+            return true;
+        }
+
         return true;
+    }
+
+    private void showPersonalRanking(Player player, String pointName) {
+        FileConfiguration config = plugin.getPointManager().getPointConfig(pointName);
+        if (config == null || !config.getBoolean("_settings.ranking_enabled", true)) {
+            player.sendMessage("§cこのポイントのランキングは非公開です。");
+            return;
+        }
+
+        // データの集計 (UUID -> 累計ポイント)
+        Map<UUID, Integer> allScores = new HashMap<>();
+        for (String key : config.getKeys(false)) {
+            if (key.startsWith("_")) continue;
+            try {
+                UUID uuid = UUID.fromString(key);
+                int total = config.getInt(key + ".total", 0);
+                allScores.put(uuid, total);
+            } catch (IllegalArgumentException ignored) {}
+        }
+
+        // ソート
+        List<Map.Entry<UUID, Integer>> sortedList = new ArrayList<>(allScores.entrySet());
+        sortedList.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+
+        // 自分の順位特定
+        int myRank = -1;
+        int myScore = 0;
+        for (int i = 0; i < sortedList.size(); i++) {
+            if (sortedList.get(i).getKey().equals(player.getUniqueId())) {
+                myRank = i + 1;
+                myScore = sortedList.get(i).getValue();
+                break;
+            }
+        }
+
+        player.sendMessage("§8§m----------§r §6§l" + pointName.toUpperCase() + " RANKING §8§m----------");
+
+        // 上位7名を表示
+        for (int i = 0; i < Math.min(sortedList.size(), 7); i++) {
+            UUID uuid = sortedList.get(i).getKey();
+            String name = Bukkit.getOfflinePlayer(uuid).getName();
+            int score = sortedList.get(i).getValue();
+
+            String color = (i == 0) ? "§e" : (i == 1) ? "§f" : (i == 2) ? "§6" : "§7";
+            player.sendMessage(color + (i + 1) + ". §r" + (name != null ? name : "Unknown") + " §7: §b" + score + " pt");
+        }
+
+        player.sendMessage("§8§m--------------------------------------");
+
+        if (myRank != -1) {
+            player.sendMessage("§fあなたの順位: §a" + myRank + "位 §7(累計: §e" + myScore + " pt§7)");
+        } else {
+            player.sendMessage("§fあなたの順位: §7圏外");
+        }
+        player.sendMessage("§8§m--------------------------------------");
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
-            StringUtil.copyPartialMatches(args[0], Arrays.asList("myp", "reward", "help"), completions);
-        } else if (args.length == 2 && (args[0].equalsIgnoreCase("myp") || args[0].equalsIgnoreCase("reward"))) {
+            StringUtil.copyPartialMatches(args[0], Arrays.asList("myp", "reward", "ranking", "help"), completions);
+        } else if (args.length == 2 && Arrays.asList("myp", "reward", "ranking").contains(args[0].toLowerCase())) {
             StringUtil.copyPartialMatches(args[1], plugin.getPointManager().getPointNames(), completions);
         }
         return completions;

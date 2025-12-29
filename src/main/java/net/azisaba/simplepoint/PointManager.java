@@ -13,9 +13,7 @@ public class PointManager {
     public PointManager(SimplePointPlugin plugin) {
         this.plugin = plugin;
         this.dataFolder = new File(plugin.getDataFolder(), "playerpointdata");
-        if (!dataFolder.exists()) {
-            dataFolder.mkdirs();
-        }
+        if (!dataFolder.exists()) dataFolder.mkdirs();
     }
 
     public boolean createPointType(String name) {
@@ -23,7 +21,6 @@ public class PointManager {
         if (file.exists()) return false;
         try {
             file.createNewFile();
-            // 初期設定を書き込む
             FileConfiguration config = YamlConfiguration.loadConfiguration(file);
             config.set("_settings.enabled", true);
             config.set("_settings.ranking_enabled", true);
@@ -42,27 +39,46 @@ public class PointManager {
     }
 
     public void saveConfig(String pointName, FileConfiguration config) {
-        try {
-            config.save(new File(dataFolder, pointName + ".yml"));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        try { config.save(new File(dataFolder, pointName + ".yml")); } catch (IOException e) { e.printStackTrace(); }
     }
 
+    // 現在の所持ポイントを取得
     public int getPoint(String pointName, UUID uuid) {
         FileConfiguration config = getPointConfig(pointName);
-        return (config != null) ? config.getInt(uuid.toString(), 0) : 0;
+        return (config != null) ? config.getInt(uuid.toString() + ".current", 0) : 0;
+    }
+
+    // 累計ポイントを取得
+    public int getTotalPoint(String pointName, UUID uuid) {
+        FileConfiguration config = getPointConfig(pointName);
+        return (config != null) ? config.getInt(uuid.toString() + ".total", 0) : 0;
+    }
+
+    public void addPoint(String pointName, UUID uuid, int amount) {
+        FileConfiguration config = getPointConfig(pointName);
+        if (config == null) return;
+
+        int current = config.getInt(uuid.toString() + ".current", 0);
+        int total = config.getInt(uuid.toString() + ".total", 0);
+
+        config.set(uuid.toString() + ".current", Math.max(0, current + amount));
+
+        // ポイントが増える時だけ累計とチーム貢献に加算 📈
+        if (amount > 0) {
+            config.set(uuid.toString() + ".total", total + amount);
+            String teamName = plugin.getTeamManager().getPlayerTeam(uuid);
+            if (teamName != null) {
+                plugin.getTeamManager().addContribution(teamName, uuid, amount);
+            }
+        }
+        saveConfig(pointName, config);
     }
 
     public void setPoint(String pointName, UUID uuid, int amount) {
         FileConfiguration config = getPointConfig(pointName);
         if (config == null) return;
-        config.set(uuid.toString(), Math.max(0, amount));
+        config.set(uuid.toString() + ".current", Math.max(0, amount));
         saveConfig(pointName, config);
-    }
-
-    public void addPoint(String pointName, UUID uuid, int amount) {
-        setPoint(pointName, uuid, getPoint(pointName, uuid) + amount);
     }
 
     public List<String> getPointNames() {
@@ -70,9 +86,7 @@ public class PointManager {
         File[] files = dataFolder.listFiles();
         if (files != null) {
             for (File f : files) {
-                if (f.getName().endsWith(".yml")) {
-                    names.add(f.getName().replace(".yml", ""));
-                }
+                if (f.getName().endsWith(".yml")) names.add(f.getName().replace(".yml", ""));
             }
         }
         return names;

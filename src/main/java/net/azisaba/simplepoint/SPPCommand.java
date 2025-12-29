@@ -65,6 +65,11 @@ public class SPPCommand implements CommandExecutor, TabCompleter {
 
             case "ranking":
                 if (args.length < 2) return false;
+                FileConfiguration config = pm.getPointConfig(args[1]);
+                if (!config.getBoolean("_settings.ranking_enabled", true)) {
+                    sender.sendMessage("§cこのポイントのランキング表示は無効化されています。");
+                    return true;
+                }
                 showRanking(sender, args[1]);
                 return true;
 

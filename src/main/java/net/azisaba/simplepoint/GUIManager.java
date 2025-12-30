@@ -3,12 +3,13 @@ package net.azisaba.simplepoint;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
-import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
@@ -22,6 +23,9 @@ public class GUIManager implements Listener {
     private final Map<UUID, SettingSession> sessions = new HashMap<>();
     private final Map<UUID, String> activeGuiId = new HashMap<>();
 
+    // インベントリ切り替え中にCloseEventを無視するためのフラグ
+    private final Set<UUID> switchingPlayers = new HashSet<>();
+
     public GUIManager(SimplePointPlugin plugin) {
         this.plugin = plugin;
     }
@@ -32,6 +36,8 @@ public class GUIManager implements Listener {
     }
 
     public void openRewardGUI(Player player, String pointName, boolean isAdmin) {
+        switchingPlayers.add(player.getUniqueId()); // 切り替えフラグON
+
         String displayName = plugin.getPointManager().getDisplayName(pointName);
         String title = displayName + (isAdmin ? "§r:編集" : "§r:受け取り");
         Inventory gui = Bukkit.createInventory(null, 54, title);
@@ -39,7 +45,6 @@ public class GUIManager implements Listener {
         activeGuiId.put(player.getUniqueId(), pointName);
 
         FileConfiguration config = plugin.getRewardManager().getRewardConfig(pointName);
-
         if (config != null) {
             for (String key : config.getKeys(false)) {
                 try {
@@ -59,38 +64,34 @@ public class GUIManager implements Listener {
                             if (stock == 0) isSoldOut = true;
                         }
                     }
-
                     if (isAdmin) isSoldOut = false;
 
                     ItemMeta meta = item.getItemMeta();
                     if (price != -1 && meta != null) {
                         List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
                         lore.add("§8----------");
-
                         if (isSoldOut) {
                             item.setType(Material.BARRIER);
                             lore.add("§c§l在庫切れ / 購入不可");
                         } else {
                             lore.add("§e価格: §f" + price + " pt");
                         }
-
                         if (isPersonal) {
                             int bought = getPersonalBoughtCount(player, pointName, slot);
                             lore.add("§b個人在庫: §f" + (stock == -1 ? "なし" : bought + " / " + stock));
                         } else {
                             lore.add("§b共有在庫: §f" + (stock == -1 ? "無限" : stock));
                         }
-
                         if (req > 0) lore.add("§6必要解放pt: §f" + req);
                         meta.setLore(lore);
                     }
-
                     item.setItemMeta(meta);
                     gui.setItem(slot, item);
                 } catch (Exception ignored) {}
             }
         }
         player.openInventory(gui);
+        switchingPlayers.remove(player.getUniqueId()); // 切り替えフラグOFF
     }
 
     @EventHandler
@@ -107,7 +108,12 @@ public class GUIManager implements Listener {
         else if (title.contains(":編集")) {
             if (event.getRawSlot() < 0 || event.getRawSlot() >= 54) return;
             event.setCancelled(true);
-            if (pId == null) return;
+
+            // pIdがnullの場合、タイトルから復元を試みる（最終防衛ライン）
+            if (pId == null) {
+                pId = title.split(":")[0].replace("§r", "");
+                activeGuiId.put(player.getUniqueId(), pId);
+            }
 
             ItemStack cursor = event.getCursor();
             ItemStack clicked = event.getCurrentItem();
@@ -126,16 +132,20 @@ public class GUIManager implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onInventoryClose(InventoryCloseEvent event) {
-        activeGuiId.remove(event.getPlayer().getUniqueId());
+        UUID uuid = event.getPlayer().getUniqueId();
+        // 画面切り替え中でなければ、データを削除する
+        if (!switchingPlayers.contains(uuid)) {
+            activeGuiId.remove(uuid);
+        }
     }
 
     private void startSetting(Player player, String pId, int slot, ItemStack item) {
         SettingSession s = new SettingSession();
         s.pointName = pId; s.slot = slot; s.item = item;
         FileConfiguration config = plugin.getRewardManager().getRewardConfig(pId);
-        if (config.contains(String.valueOf(slot))) {
+        if (config != null && config.contains(String.valueOf(slot))) {
             s.price = config.getInt(slot + ".price");
             s.stock = config.getInt(slot + ".stock", -1);
             s.isPersonal = config.getBoolean(slot + ".is_personal", false);
@@ -146,6 +156,9 @@ public class GUIManager implements Listener {
 
     public void openSettingGUI(Player player) {
         SettingSession s = sessions.get(player.getUniqueId());
+        if (s == null) return;
+
+        switchingPlayers.add(player.getUniqueId());
         String displayName = plugin.getPointManager().getDisplayName(s.pointName);
         Inventory inv = Bukkit.createInventory(null, 27, "報酬設定: " + displayName);
         inv.setItem(4, s.item);
@@ -166,6 +179,7 @@ public class GUIManager implements Listener {
         inv.setItem(13, createGuiItem(Material.GOLD_BLOCK, "§e§l保存", "§7スロット: " + s.slot));
         inv.setItem(22, createGuiItem(Material.BARRIER, "§4§l削除", ""));
         player.openInventory(inv);
+        switchingPlayers.remove(player.getUniqueId());
     }
 
     private void handleSetting(Player player, int slot, ClickType click) {
@@ -191,14 +205,18 @@ public class GUIManager implements Listener {
         else if (slot == 18) s.price = (s.price == -1) ? 100 : -1;
         else if (slot == 19) s.isPersonal = !s.isPersonal;
         else if (slot == 22) {
-            plugin.getRewardManager().deleteReward(s.pointName, s.slot);
-            player.closeInventory();
+            String pId = s.pointName;
+            plugin.getRewardManager().deleteReward(pId, s.slot);
+            sessions.remove(player.getUniqueId());
+            openRewardGUI(player, pId, true);
             return;
         }
         else if (slot == 13) {
-            plugin.getRewardManager().saveReward(s.pointName, s.slot, s.item, s.price, s.stock, s.isPersonal);
+            String pId = s.pointName;
+            plugin.getRewardManager().saveReward(pId, s.slot, s.item, s.price, s.stock, s.isPersonal);
             player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
-            player.closeInventory();
+            sessions.remove(player.getUniqueId());
+            openRewardGUI(player, pId, true);
             return;
         }
         openSettingGUI(player);
@@ -233,9 +251,7 @@ public class GUIManager implements Listener {
         }
 
         int balance = plugin.getPointManager().getPoint(pointName, player.getUniqueId());
-
         if (balance >= price) {
-            // ✨ ログ用にアイテム名を取得
             ItemStack rewardItem = config.getItemStack(slot + ".item");
             String itemName = (rewardItem != null && rewardItem.hasItemMeta() && rewardItem.getItemMeta().hasDisplayName())
                     ? rewardItem.getItemMeta().getDisplayName()
@@ -249,8 +265,6 @@ public class GUIManager implements Listener {
 
             plugin.getPointManager().addPoint(pointName, player.getUniqueId(), -price);
             if (rewardItem != null) player.getInventory().addItem(rewardItem.clone());
-
-            // ✨ 購入ログの記録
             plugin.getLogManager().logRewardPurchase(player.getName(), pointName, itemName, price);
 
             player.sendMessage("§a購入完了！");

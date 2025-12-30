@@ -12,7 +12,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class SPTCommand implements CommandExecutor, TabCompleter {
     private final SimplePointPlugin plugin;
@@ -24,8 +23,7 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行可能です。");
-            return true;
+            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行可能です.");
         }
         Player p = (Player) sender;
 
@@ -47,12 +45,18 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             String pointId = args[1];
-            if (plugin.getPointManager().getPointConfig(pointId) == null) {
+            FileConfiguration cfg = plugin.getPointManager().getPointConfig(pointId);
+            if (cfg == null) {
                 p.sendMessage("§cそのポイント名は存在しません。");
                 return true;
             }
 
-            // ✨ 表示名を取得
+            // 全機能無効化のチェック
+            if (!cfg.getBoolean("_settings.function_enabled", true)) {
+                p.sendMessage("§c現在、このポイントの機能は停止されています。");
+                return true;
+            }
+
             String displayName = plugin.getPointManager().getDisplayName(pointId);
             int current = plugin.getPointManager().getPoint(pointId, p.getUniqueId());
             int total = plugin.getPointManager().getTotalPoint(pointId, p.getUniqueId());
@@ -77,15 +81,19 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 p.sendMessage("§cそのポイント名は存在しません。");
                 return true;
             }
-            if (!cfg.getBoolean("_settings.ranking_enabled", true)) {
-                p.sendMessage("§c現在、" + displayName + " §cの報酬ショップは利用できません。");
+
+            // 1. 全機能フラグのチェック
+            if (!cfg.getBoolean("_settings.function_enabled", true)) {
+                p.sendMessage("§c現在、" + displayName + " §cの全機能は停止されています。");
                 return true;
             }
+
+            // 2. 報酬個別フラグのチェック
             if (!cfg.getBoolean("_settings.reward_enabled", true)) {
                 p.sendMessage("§c現在、" + displayName + " §cの報酬ショップは閉鎖されています。");
                 return true;
             }
-            // 内部IDを使ってGUIを開く
+
             plugin.getGuiManager().openRewardGUI(p, pointId, false);
             return true;
         }
@@ -106,8 +114,20 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
         FileConfiguration config = plugin.getPointManager().getPointConfig(pointId);
         String displayName = plugin.getPointManager().getDisplayName(pointId);
 
-        if (config == null || !config.getBoolean("_settings.ranking_enabled", true)) {
-            player.sendMessage("§c" + displayName + " §cのランキングは非公開です。");
+        if (config == null) {
+            player.sendMessage("§cそのポイント名は存在しません。");
+            return;
+        }
+
+        // 1. 全機能フラグのチェック
+        if (!config.getBoolean("_settings.function_enabled", true)) {
+            player.sendMessage("§c現在、" + displayName + " §cの全機能は停止されています。");
+            return;
+        }
+
+        // 2. ランキング個別フラグのチェック
+        if (!config.getBoolean("_settings.ranking_enabled", true)) {
+            player.sendMessage("§c現在、" + displayName + " §cのランキングは非公開です。");
             return;
         }
 
@@ -163,7 +183,6 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             StringUtil.copyPartialMatches(args[0], Arrays.asList("myp", "reward", "ranking", "help"), completions);
         } else if (args.length == 2 && Arrays.asList("myp", "reward", "ranking").contains(args[0].toLowerCase())) {
-            // タブ補完は内部IDを出す（コマンド引数がIDであるため）
             StringUtil.copyPartialMatches(args[1], plugin.getPointManager().getPointNames(), completions);
         }
         return completions;

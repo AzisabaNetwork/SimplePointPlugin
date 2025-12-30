@@ -138,13 +138,43 @@ public class SPPCommand implements CommandExecutor {
                 break;
 
             case "toggleranking":
-                if (args.length < 2) return false;
-                FileConfiguration cfg = plugin.getPointManager().getPointConfig(args[1]);
-                if (cfg == null) return true;
-                boolean newState = !cfg.getBoolean("_settings.ranking_enabled", true);
-                cfg.set("_settings.ranking_enabled", newState);
-                plugin.getPointManager().savePointConfig(args[1]);
-                sender.sendMessage("§a報酬/ランキングを " + (newState ? "§2有効" : "§4無効") + " にしました。");
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /spp toggleranking <ID>");
+                    return true;
+                }
+                String rankId = args[1];
+                FileConfiguration rankCfg = plugin.getPointManager().getPointConfig(rankId);
+                if (rankCfg == null) {
+                    sender.sendMessage("§cそのIDは存在しません。");
+                    return true;
+                }
+                // ランキングのみ反転
+                boolean currentRankState = rankCfg.getBoolean("_settings.ranking_enabled", true);
+                rankCfg.set("_settings.ranking_enabled", !currentRankState);
+                plugin.getPointManager().savePointConfig(rankId);
+                sender.sendMessage("§a" + rankId + " §fのランキング表示を " + (!currentRankState ? "§2有効" : "§4無効") + " §fにしました。");
+                break;
+
+            case "togglefunction":
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /spp togglefunction <ID>");
+                    return true;
+                }
+                String funcId = args[1];
+                FileConfiguration funcCfg = plugin.getPointManager().getPointConfig(funcId);
+                if (funcCfg == null) {
+                    sender.sendMessage("§cそのIDは存在しません。");
+                    return true;
+                }
+                // 両方を一括設定（現在の状態を見て、両方OFFまたは両方ONに切り替え）
+                boolean currentState = funcCfg.getBoolean("_settings.function_enabled", true);
+                boolean nextState = !currentState;
+
+                funcCfg.set("_settings.function_enabled", nextState);
+                // functionがOFFなら、個別の設定に関わらず両方止めるためのフラグとして機能させます
+                plugin.getPointManager().savePointConfig(funcId);
+
+                sender.sendMessage("§a" + funcId + " §fの全機能(ランキング・報酬)を " + (nextState ? "§2有効" : "§4無効") + " §fにしました。");
                 break;
 
             case "reload":
@@ -241,6 +271,7 @@ public class SPPCommand implements CommandExecutor {
         sender.sendMessage("  §f/spp §fsetreq §7<ID> <Slot> <pt> - 解放条件設定");
         sender.sendMessage("  §f/spp §ftoggleranking §7<ID> - ランキング有効化切替");
         sender.sendMessage("  §f/spp §ftoggleranking §7<ID> - 報酬受け取り有効化切替");
+        sender.sendMessage("  §f/spp §ftogglefunction §7<ID> - 報酬受け取り、ランキング有効化切替");
         sender.sendMessage("  §f/spp §fcreateteam §7<チーム名> - チームデータ作成");
         sender.sendMessage("  §f/spp §freload §7- コンフィグリロード");
         sender.sendMessage("");

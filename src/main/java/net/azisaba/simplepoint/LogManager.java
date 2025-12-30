@@ -1,60 +1,99 @@
 package net.azisaba.simplepoint;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.zip.GZIPOutputStream;
 
 public class LogManager {
     private final SimplePointPlugin plugin;
     private final File logFolder;
+    private String currentFileDate;
 
     public LogManager(SimplePointPlugin plugin) {
         this.plugin = plugin;
-        // 1. データフォルダの中に「logs」フォルダを作成
         this.logFolder = new File(plugin.getDataFolder(), "logs");
         if (!logFolder.exists()) {
             logFolder.mkdirs();
         }
+
+        // 起動時の日付を保持
+        this.currentFileDate = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
+
+        // 起動時チェック: 昨日以前の .log ファイルが残っていれば圧縮する
+        initialCheck();
     }
 
-    /**
-     * ポイント変更のログを日付別のファイルに記録する
-     */
-    public void logPointChange(String playerName, String pointId, int amount, String type) {
-        // 2. 今日の日付でファイル名を作成 (例: 2023-10-27.log)
-        String fileName = new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + ".log";
-        File logFile = new File(logFolder, fileName);
+    private void initialCheck() {
+        File[] files = logFolder.listFiles((dir, name) -> name.endsWith(".log") && !name.equals(currentFileDate + ".log"));
+        if (files != null) {
+            for (File file : files) {
+                compressFile(file);
+            }
+        }
+    }
 
-        // 3. ログの時刻と内容を構築
+    public synchronized void logPointChange(String playerName, String pointId, int amount, String type) {
+        checkRotation();
         String timeStamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        // [時刻] プレイヤー名, ポイントID, 増減量, 操作タイプ
         String logMessage = String.format("[%s] %s, %s, %d, %s", timeStamp, playerName, pointId, amount, type);
+        writeLog(logMessage);
+    }
 
-        // 4. ファイルに書き込み (trueで追記モード)
-        try (FileWriter fw = new FileWriter(logFile, true);
-             PrintWriter pw = new PrintWriter(fw)) {
-            pw.println(logMessage);
+    public synchronized void logRewardPurchase(String playerName, String pointId, String rewardName, int price) {
+        checkRotation();
+        String timeStamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        String logMessage = String.format("[%s] [PURCHASE] %s, %s, %s, %d pt",
+                timeStamp, playerName, pointId, rewardName, price);
+        writeLog(logMessage);
+    }
+
+    private void writeLog(String message) {
+        File logFile = new File(logFolder, currentFileDate + ".log");
+        try (PrintWriter pw = new PrintWriter(new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(logFile, true), StandardCharsets.UTF_8)))) {
+            pw.println(message);
         } catch (IOException e) {
             plugin.getLogger().severe("ログの書き込みに失敗しました: " + e.getMessage());
         }
     }
-    public void logRewardPurchase(String playerName, String pointId, String rewardName, int price) {
-        String fileName = new SimpleDateFormat("yyyy-MM-dd").format(new Date()) + ".log";
-        File logFile = new File(logFolder, fileName);
 
-        String timeStamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        // [時刻] [PURCHASE] プレイヤー名, ポイントID, 報酬名, 消費ポイント
-        String logMessage = String.format("[%s] [PURCHASE] %s, %s, %s, %d pt",
-                timeStamp, playerName, pointId, rewardName, price);
-
-        try (FileWriter fw = new FileWriter(logFile, true);
-             PrintWriter pw = new PrintWriter(fw)) {
-            pw.println(logMessage);
-        } catch (IOException e) {
-            plugin.getLogger().severe("購入ログの書き込みに失敗しました: " + e.getMessage());
+    private void checkRotation() {
+        String today = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
+        if (!today.equals(currentFileDate)) {
+            File oldFile = new File(logFolder, currentFileDate + ".log");
+            if (oldFile.exists()) {
+                compressFile(oldFile);
+            }
+            this.currentFileDate = today;
         }
+    }
+
+    private void compressFile(File source) {
+        File dest = new File(source.getAbsolutePath() + ".gz");
+        if (dest.exists()) return; // 既に圧縮済みの場合はスキップ
+
+        // メインスレッドを止めないよう、新しいスレッドで圧縮を実行
+        new Thread(() -> {
+            try (FileInputStream fis = new FileInputStream(source);
+                 FileOutputStream fos = new FileOutputStream(dest);
+                 GZIPOutputStream gzos = new GZIPOutputStream(fos)) {
+
+                byte[] buffer = new byte[1024];
+                int len;
+                while ((len = fis.read(buffer)) > 0) {
+                    gzos.write(buffer, 0, len);
+                }
+                gzos.finish();
+
+                if (source.delete()) {
+                    // サーバー起動直後などはLoggerが使えない場合があるため例外処理
+                    try { plugin.getLogger().info("古いログをアーカイブしました: " + dest.getName()); } catch (Exception ignored) {}
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 }

@@ -78,7 +78,7 @@ public class GUIManager implements Listener {
                         }
                         if (isPersonal) {
                             int bought = getPersonalBoughtCount(player, pointName, slot);
-                            lore.add("§b個人在庫: §f" + (stock == -1 ? "なし" : bought + " / " + stock));
+                            lore.add("§a個人在庫: §f" + (stock == -1 ? "なし" : bought + " / " + stock));
                         } else {
                             lore.add("§b共有在庫: §f" + (stock == -1 ? "無限" : stock));
                         }
@@ -174,7 +174,7 @@ public class GUIManager implements Listener {
         inv.setItem(18, createGuiItem(Material.PAINTING, "§d§l装飾モード切替", "§7現在: " + (s.price == -1 ? "§aON" : "§cOFF")));
 
         inv.setItem(19, createGuiItem(Material.PLAYER_HEAD, "§6§l在庫モード切替",
-                "§7現在: " + (s.isPersonal ? "§a個人制限" : "§e共有在庫") + "\n§8クリックで切り替え"));
+                "§7現在: " + (s.isPersonal ? "§a個人在庫" : "§e共有在庫") + "\n§8クリックで切り替え"));
 
         inv.setItem(13, createGuiItem(Material.GOLD_BLOCK, "§e§l保存", "§7スロット: " + s.slot));
         inv.setItem(22, createGuiItem(Material.BARRIER, "§4§l削除", ""));

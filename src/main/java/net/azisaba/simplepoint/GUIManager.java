@@ -3,6 +3,7 @@ package net.azisaba.simplepoint;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -22,7 +23,6 @@ public class GUIManager implements Listener {
     private final Map<UUID, SettingSession> sessions = new HashMap<>();
     private final Map<UUID, String> activeGuiId = new HashMap<>();
 
-    // インベントリ切り替え中にCloseEventを無視するためのフラグ
     private final Set<UUID> switchingPlayers = new HashSet<>();
 
     public GUIManager(SimplePointPlugin plugin) {
@@ -35,7 +35,7 @@ public class GUIManager implements Listener {
     }
 
     public void openRewardGUI(Player player, String pointName, boolean isAdmin) {
-        switchingPlayers.add(player.getUniqueId()); // 切り替えフラグON
+        switchingPlayers.add(player.getUniqueId());
 
         String displayName = plugin.getPointManager().getDisplayName(pointName);
         String title = displayName + (isAdmin ? "§r:編集" : "§r:受け取り");
@@ -82,6 +82,23 @@ public class GUIManager implements Listener {
                             lore.add("§b共有在庫: §f" + (stock == -1 ? "無限" : stock));
                         }
                         if (req > 0) lore.add("§6必要解放pt: §f" + req);
+
+                        // --- 追加機能: カスタム説明文の表示 ---
+                        List<String> customLoreRaw = config.getStringList(slot + ".customlore");
+                        if (customLoreRaw != null && !customLoreRaw.isEmpty()) {
+                            lore.add(""); // スペースを空ける
+                            for (String line : customLoreRaw) {
+                                // | で改行
+                                String[] splitLines = line.split("\\|");
+                                for (String s : splitLines) {
+                                    String processed = ChatColor.translateAlternateColorCodes('&', s)
+                                            .replace("%player%", player.getName())
+                                            .replace("%point%", String.valueOf(plugin.getPointManager().getPoint(pointName, player.getUniqueId())));
+                                    lore.add(processed);
+                                }
+                            }
+                        }
+
                         meta.setLore(lore);
                     }
                     item.setItemMeta(meta);
@@ -90,7 +107,7 @@ public class GUIManager implements Listener {
             }
         }
         player.openInventory(gui);
-        switchingPlayers.remove(player.getUniqueId()); // 切り替えフラグOFF
+        switchingPlayers.remove(player.getUniqueId());
     }
 
     @EventHandler
@@ -249,7 +266,6 @@ public class GUIManager implements Listener {
 
         int balance = plugin.getPointManager().getPoint(pointName, player.getUniqueId());
         if (balance >= price) {
-            // --- 追加: コマンド実行ロジック ---
             List<String> commands = config.getStringList(slot + ".commands");
             if (commands != null && !commands.isEmpty()) {
                 for (String cmd : commands) {
@@ -271,7 +287,6 @@ public class GUIManager implements Listener {
                 player.getInventory().addItem(rewardItem.clone());
             }
 
-            // ログ用の名前取得
             String itemName = (rewardItem != null && rewardItem.hasItemMeta() && rewardItem.getItemMeta().hasDisplayName())
                     ? rewardItem.getItemMeta().getDisplayName()
                     : (rewardItem != null && rewardItem.getType() != Material.AIR ? rewardItem.getType().toString() : "Command Reward");

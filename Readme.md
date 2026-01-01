@@ -1,5 +1,5 @@
 # SimplePoint
-**Version:** 1.0.0<br>
+**Version:** 1.3.0<br>
 **Native Minecraft Version:** 1.16.5<br>
 **Author:** pino223<br>
 **LICENSE:** [GPL-3.0](LICENSE)<br>
@@ -61,6 +61,12 @@
 commands:
     - "broadcast %point% から %player% が豪華賞品をゲットしました！"
     - "give %player% diamond 1"
+```
+* **説明文追加**: コマンド実行と同様にして説明文を追加できます。説明文は一番下に表示されます。
+```
+customlore:
+    - "test|&6こんちは"
+    - "&eあなたの名前: &f%player%|&a所持ポイント: &f%point% pt"
 ```
 
 ### ログ記録

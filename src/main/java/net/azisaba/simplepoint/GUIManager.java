@@ -9,7 +9,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.ClickType;
-import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
@@ -109,7 +108,6 @@ public class GUIManager implements Listener {
             if (event.getRawSlot() < 0 || event.getRawSlot() >= 54) return;
             event.setCancelled(true);
 
-            // pIdがnullの場合、タイトルから復元を試みる（最終防衛ライン）
             if (pId == null) {
                 pId = title.split(":")[0].replace("§r", "");
                 activeGuiId.put(player.getUniqueId(), pId);
@@ -135,7 +133,6 @@ public class GUIManager implements Listener {
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInventoryClose(InventoryCloseEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
-        // 画面切り替え中でなければ、データを削除する
         if (!switchingPlayers.contains(uuid)) {
             activeGuiId.remove(uuid);
         }
@@ -252,10 +249,14 @@ public class GUIManager implements Listener {
 
         int balance = plugin.getPointManager().getPoint(pointName, player.getUniqueId());
         if (balance >= price) {
-            ItemStack rewardItem = config.getItemStack(slot + ".item");
-            String itemName = (rewardItem != null && rewardItem.hasItemMeta() && rewardItem.getItemMeta().hasDisplayName())
-                    ? rewardItem.getItemMeta().getDisplayName()
-                    : (rewardItem != null ? rewardItem.getType().toString() : "Unknown Item");
+            // --- 追加: コマンド実行ロジック ---
+            List<String> commands = config.getStringList(slot + ".commands");
+            if (commands != null && !commands.isEmpty()) {
+                for (String cmd : commands) {
+                    String finalCmd = cmd.replace("<player>", player.getName());
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), finalCmd);
+                }
+            }
 
             if (isPersonal) {
                 addPersonalBoughtCount(player, pointName, slot);
@@ -264,7 +265,17 @@ public class GUIManager implements Listener {
             }
 
             plugin.getPointManager().addPoint(pointName, player.getUniqueId(), -price);
-            if (rewardItem != null) player.getInventory().addItem(rewardItem.clone());
+
+            ItemStack rewardItem = config.getItemStack(slot + ".item");
+            if (rewardItem != null && rewardItem.getType() != Material.AIR) {
+                player.getInventory().addItem(rewardItem.clone());
+            }
+
+            // ログ用の名前取得
+            String itemName = (rewardItem != null && rewardItem.hasItemMeta() && rewardItem.getItemMeta().hasDisplayName())
+                    ? rewardItem.getItemMeta().getDisplayName()
+                    : (rewardItem != null && rewardItem.getType() != Material.AIR ? rewardItem.getType().toString() : "Command Reward");
+
             plugin.getLogManager().logRewardPurchase(player.getName(), pointName, itemName, price);
 
             player.sendMessage("§a購入完了！");

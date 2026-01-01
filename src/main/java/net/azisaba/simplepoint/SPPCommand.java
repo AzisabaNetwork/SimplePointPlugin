@@ -130,11 +130,35 @@ public class SPPCommand implements CommandExecutor {
                 break;
 
             case "score":
-                if (args.length < 3) return false;
-                String ptId = args[1];
-                OfflinePlayer tPlayer = Bukkit.getOfflinePlayer(args[2]);
-                int score = plugin.getPointManager().getPoint(ptId, tPlayer.getUniqueId());
-                sender.sendMessage("§e" + tPlayer.getName() + " の " + ptId + ": §f" + score + "pt");
+                // 順序を他と統一: /spp score <ID> <プレイヤー名>
+                if (args.length < 3) {
+                    sender.sendMessage("§c使用法: /spp score <ID> <プレイヤー名>");
+                    return true;
+                }
+                String scoreId = args[1];
+                String targetName = args[2];
+
+                // 1. ポイントIDの存在チェック
+                if (plugin.getPointManager().getPointConfig(scoreId) == null) {
+                    sender.sendMessage("§cそのID（" + scoreId + "）は存在しません。");
+                    return true;
+                }
+
+                // 2. プレイヤーの取得 (名前からOfflinePlayerを取得)
+                // hasPlayedBefore() 判定は、プラグイン側にデータがあるなら無視して進むのが確実です
+                OfflinePlayer offlineTarget = Bukkit.getOfflinePlayer(targetName);
+                UUID targetUUID = offlineTarget.getUniqueId();
+
+                // 3. ポイントデータの取得
+                String scoreDisplay = plugin.getPointManager().getDisplayName(scoreId);
+                int currentPoints = plugin.getPointManager().getPoint(scoreId, targetUUID);
+                int totalPoints = plugin.getPointManager().getTotalPoint(scoreId, targetUUID);
+
+                // 4. 表示
+                sender.sendMessage("§8§m-------§r " + scoreDisplay + " §b§lINFO: §f" + targetName + " §8§m-------");
+                sender.sendMessage("§7現在の所持ポイント: §e" + currentPoints + " pt");
+                sender.sendMessage("§7これまでの累計獲得: §a" + totalPoints + " pt");
+                sender.sendMessage("§8§m--------------------------------------");
                 break;
 
             case "toggleranking":

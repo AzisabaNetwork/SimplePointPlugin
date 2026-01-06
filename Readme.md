@@ -33,7 +33,7 @@
   指定したポイントのランキング表示を有効/無効にします。
 * `togglereward <point>`  
     指定したポイントの報酬ショップを有効/無効にします。
-* `toggleranking <point>`  
+* `togglefunction <point>`  
     指定したポイントのランキング表示・報酬ショップを有効/無効にします。
 * `reload`  
   configや報酬、ポイントデータのキャッシュをリロードします。

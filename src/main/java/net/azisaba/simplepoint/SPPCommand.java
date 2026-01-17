@@ -161,6 +161,67 @@ public class SPPCommand implements CommandExecutor {
                 sender.sendMessage("§8§m--------------------------------------");
                 break;
 
+            case "userrank":
+                if (args.length < 3) {
+                    sender.sendMessage("§c使用法: /spp userrank <ID> <順位>");
+                    return true;
+                }
+                String rankCheckId = args[1];
+                int rankNum;
+                try {
+                    rankNum = Integer.parseInt(args[2]);
+                    if (rankNum < 1) throw new NumberFormatException();
+                } catch (NumberFormatException e) {
+                    sender.sendMessage("§c順位は1以上の整数で指定してください。");
+                    return true;
+                }
+
+                FileConfiguration rcCfg = plugin.getPointManager().getPointConfig(rankCheckId);
+                if (rcCfg == null) {
+                    sender.sendMessage("§cそのIDは存在しません。");
+                    return true;
+                }
+
+                // ランキングデータの収集とソート
+                Map<String, Integer> rankScores = new HashMap<>();
+                for (String key : rcCfg.getKeys(false)) {
+                    if (key.startsWith("_")) continue;
+                    int total = rcCfg.getInt(key + ".total", 0);
+                    try {
+                        OfflinePlayer op = Bukkit.getOfflinePlayer(UUID.fromString(key));
+                        // 名前が解決できない場合はUUIDなどを表示
+                        String name = (op.getName() != null) ? op.getName() : "Unknown";
+                        rankScores.put(name, total);
+                    } catch (IllegalArgumentException ignored) {}
+                }
+
+                if (rankScores.isEmpty()) {
+                    sender.sendMessage("§cランキングデータが存在しません。");
+                    return true;
+                }
+
+                if (rankNum > rankScores.size()) {
+                    sender.sendMessage("§cその順位のデータは存在しません。(現在の参加者: " + rankScores.size() + "人)");
+                    return true;
+                }
+
+                // スコア順(降順)にソート
+                List<Map.Entry<String, Integer>> rankList = new ArrayList<>(rankScores.entrySet());
+                rankList.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+
+                // 指定された順位 (インデックスは rankNum - 1) のデータを取得
+                Map.Entry<String, Integer> rankEntry = rankList.get(rankNum - 1);
+                String rankPName = rankEntry.getKey();
+                int rankPScore = rankEntry.getValue();
+                String rankDispName = plugin.getPointManager().getDisplayName(rankCheckId);
+
+                sender.sendMessage("§8§m-------§r " + rankDispName + " §6§lRANK CHECK §8§m-------");
+                sender.sendMessage("§6§l" + rankNum + "位 §7のプレイヤー:");
+                sender.sendMessage("§f名前: §e" + rankPName);
+                sender.sendMessage("§f累計: §a" + rankPScore + " pt");
+                sender.sendMessage("§8§m--------------------------------------");
+                break;
+
             case "toggleranking":
                 if (args.length < 2) {
                     sender.sendMessage("§c使用法: /spp toggleranking <ID>");
@@ -297,6 +358,7 @@ public class SPPCommand implements CommandExecutor {
         sender.sendMessage("  §f/spp §ftoggleranking §7<ID> - 報酬受け取り有効化切替");
         sender.sendMessage("  §f/spp §ftogglefunction §7<ID> - 報酬受け取り、ランキング有効化切替");
         sender.sendMessage("  §f/spp §fcreateteam §7<チーム名> - チームデータ作成");
+        sender.sendMessage("  §f/spp §fuserrank <ID> <順位> §7- 指定したランキングのプレイヤー表示");
         sender.sendMessage("  §f/spp §freload §7- コンフィグリロード");
         sender.sendMessage("");
         sender.sendMessage(" §7※ §b<ID>§7は内部用英数字、§b<表示名>§7は日本語/色可");

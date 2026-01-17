@@ -269,6 +269,64 @@ public class SPPCommand implements CommandExecutor {
                 sender.sendMessage("§a[SimplePoint] 設定と報酬データをリロードしました。");
                 break;
 
+            case "adminranking":
+                if (args.length < 3) {
+                    sender.sendMessage("§c使用法: /spp adminranking <ID> <表示件数>");
+                    return true;
+                }
+                String adminRankId = args[1];
+                int limit;
+                try {
+                    limit = Integer.parseInt(args[2]);
+                    if (limit < 1) throw new NumberFormatException();
+                } catch (NumberFormatException e) {
+                    sender.sendMessage("§c件数は1以上の整数で指定してください。");
+                    return true;
+                }
+
+                FileConfiguration arCfg = plugin.getPointManager().getPointConfig(adminRankId);
+                if (arCfg == null) {
+                    sender.sendMessage("§cそのIDは存在しません。");
+                    return true;
+                }
+
+                // データの収集
+                Map<String, Integer> arScores = new HashMap<>();
+                for (String key : arCfg.getKeys(false)) {
+                    if (key.startsWith("_")) continue;
+                    int total = arCfg.getInt(key + ".total", 0);
+                    try {
+                        OfflinePlayer op = Bukkit.getOfflinePlayer(UUID.fromString(key));
+                        String name = (op.getName() != null) ? op.getName() : "Unknown(" + key.substring(0, 8) + ")";
+                        arScores.put(name, total);
+                    } catch (IllegalArgumentException ignored) {}
+                }
+
+                if (arScores.isEmpty()) {
+                    sender.sendMessage("§cランキングデータがありません。");
+                    return true;
+                }
+
+                // ソート
+                List<Map.Entry<String, Integer>> arList = new ArrayList<>(arScores.entrySet());
+                arList.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+
+                String arDispName = plugin.getPointManager().getDisplayName(adminRankId);
+                sender.sendMessage("§8§m-------§r " + arDispName + " §6§lTOP " + limit + " §8§m-------");
+
+                // 指定された数（limit）またはデータ全件の少ない方までループ
+                for (int i = 0; i < Math.min(arList.size(), limit); i++) {
+                    String name = arList.get(i).getKey();
+                    int score = arList.get(i).getValue();
+
+                    // 順位に応じた色分け (1-3位は特別色、それ以外は白)
+                    String rankColor = (i == 0) ? "§e§l" : (i == 1) ? "§f§l" : (i == 2) ? "§6§l" : "§7";
+                    sender.sendMessage(rankColor + (i + 1) + ". §r" + name + " §7- §b" + score + " pt");
+                }
+
+                sender.sendMessage("§8§m--------------------------------------");
+                break;
+
             case "togglereward":
                 if (args.length < 2) {
                     sender.sendMessage("§c使用法: /spp togglereward <ID>");
@@ -342,7 +400,7 @@ public class SPPCommand implements CommandExecutor {
         sender.sendMessage("   §6§lSimplePoint §e§l管理マネージャー");
         sender.sendMessage("");
         sender.sendMessage(" §e§l▶ §a§lポイント基本操作");
-        sender.sendMessage("  §f/spp §a§lcreate §b<ID> <表示名...> §7- 新規作成");
+        sender.sendMessage("  §f/spp §a§lcreate §b<ID> <表示名> §7- 新規作成");
         sender.sendMessage("  §f/spp §a§ladd §b<ID> <プレイヤー> <数> §7- 付与");
         sender.sendMessage("  §f/spp §a§lremove §b<ID> <プレイヤー> <数> §7- 剥奪");
         sender.sendMessage("  §f/spp §a§lset §b<ID> <プレイヤー> <数> §7- 上書き");
@@ -350,7 +408,9 @@ public class SPPCommand implements CommandExecutor {
         sender.sendMessage(" §e§l▶ §a§lデータ確認・報酬設定");
         sender.sendMessage("  §f/spp §a§lscore §b<ID> <プレイヤー> §7- 所持状況確認");
         sender.sendMessage("  §f/spp §a§lrewardgui §b<ID> §7- 報酬スロット編集");
-        sender.sendMessage("  §f/spp §a§lranking §b<ID> §7- ランキング表示");
+        sender.sendMessage("  §f/spp §a§lranking §b<ID> §7- §f§l全体チャット§7へのランキング表示");
+        sender.sendMessage("  §f/spp §a§ladminranking <ID> <表示件数> §7- 任意の順位までのランキング表示");
+        sender.sendMessage("  §f/spp §a§luserrank <ID> <順位> §7- 指定したランキングのプレイヤー表示");
         sender.sendMessage("");
         sender.sendMessage(" §e§l▶ §fシステム設定");
         sender.sendMessage("  §f/spp §fsetreq §7<ID> <Slot> <pt> - 解放条件設定");
@@ -358,7 +418,7 @@ public class SPPCommand implements CommandExecutor {
         sender.sendMessage("  §f/spp §ftoggleranking §7<ID> - 報酬受け取り有効化切替");
         sender.sendMessage("  §f/spp §ftogglefunction §7<ID> - 報酬受け取り、ランキング有効化切替");
         sender.sendMessage("  §f/spp §fcreateteam §7<チーム名> - チームデータ作成");
-        sender.sendMessage("  §f/spp §fuserrank <ID> <順位> §7- 指定したランキングのプレイヤー表示");
+
         sender.sendMessage("  §f/spp §freload §7- コンフィグリロード");
         sender.sendMessage("");
         sender.sendMessage(" §7※ §b<ID>§7は内部用英数字、§b<表示名>§7は日本語/色可");

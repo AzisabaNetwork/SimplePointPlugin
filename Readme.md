@@ -54,10 +54,10 @@
 <br>
 <br>
 ### Shortcut
-* `myp <point>`<br>
-spp myp の短縮コマンド
+* `myp <point>`
+<br>spp myp の短縮コマンド。
 * `ranking <point`<br>
-spp ranking の短縮コマンド
+spp ranking の短縮コマンド。
 ***
 
 ## 機能

@@ -409,8 +409,8 @@ public class SPPCommand implements CommandExecutor {
         sender.sendMessage("  §f/spp §a§lscore §b<ID> <プレイヤー> §7- 所持状況確認");
         sender.sendMessage("  §f/spp §a§lrewardgui §b<ID> §7- 報酬スロット編集");
         sender.sendMessage("  §f/spp §a§lranking §b<ID> §7- §f§l全体チャット§7へのランキング表示");
-        sender.sendMessage("  §f/spp §a§ladminranking <ID> <表示件数> §7- 任意の順位までのランキング表示");
-        sender.sendMessage("  §f/spp §a§luserrank <ID> <順位> §7- 指定したランキングのプレイヤー表示");
+        sender.sendMessage("  §f/spp §a§ladminranking §b<ID> <表示件数> §7- 任意の順位までのランキング表示");
+        sender.sendMessage("  §f/spp §a§luserrank §b<ID> <順位> §7- 指定したランキングのプレイヤー表示");
         sender.sendMessage("");
         sender.sendMessage(" §e§l▶ §fシステム設定");
         sender.sendMessage("  §f/spp §fsetreq §7<ID> <Slot> <pt> - 解放条件設定");

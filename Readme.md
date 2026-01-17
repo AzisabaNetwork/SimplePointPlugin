@@ -1,5 +1,5 @@
 # SimplePoint
-**Version:** 1.3.0<br>
+**Version:** 1.4.0<br>
 **Native Minecraft Version:** 1.16.5<br>
 **Author:** pino223<br>
 **LICENSE:** [GPL-3.0](LICENSE)<br>
@@ -49,7 +49,13 @@
   報酬ショップGUIを開きます。
 * `ranking <point>`  
   上位7名のランキングと、**自分の現在の順位**を確認します。
-
+<br>
+<br>
+### Shortcut
+* `myp <point>`<br>
+spp myp の短縮コマンド
+* `ranking <point`<br>
+spp ranking の短縮コマンド
 ***
 
 ## 機能

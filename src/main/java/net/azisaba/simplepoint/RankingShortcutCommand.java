@@ -37,9 +37,20 @@ public class RankingShortcutCommand implements CommandExecutor, TabCompleter {
         FileConfiguration config = plugin.getPointManager().getPointConfig(pointId);
         String displayName = plugin.getPointManager().getDisplayName(pointId);
 
-        // コンフィグが存在するか、ランキングが有効かチェック
-        if (config == null || !config.getBoolean("_settings.ranking_enabled", true)) {
-            player.sendMessage("§c" + displayName + " §cのランキングは非公開、または存在しません。");
+        if (config == null) {
+            player.sendMessage("§cそのポイント名は存在しません。");
+            return true;
+        }
+
+        // [Check] 全機能停止 (togglefunction)
+        if (!config.getBoolean("_settings.function_enabled", true)) {
+            player.sendMessage("§c現在、" + displayName + " §cの全機能は停止されています。");
+            return true;
+        }
+
+        // [Check] ランキング機能停止 (toggleranking)
+        if (!config.getBoolean("_settings.ranking_enabled", true)) {
+            player.sendMessage("§c" + displayName + " §cのランキングは現在非公開です。");
             return true;
         }
 

@@ -35,7 +35,7 @@
     指定したポイントの報酬ショップを有効/無効にします。
 * `togglefunction <point>`  
     指定したポイントのランキング表示・報酬ショップを有効/無効にします。
-* `userrunk <point> <number>`
+* `userrunk <point> <number>`<br>
     指定したポイントの任意のランキングのプレイヤーが誰かを検索します。
 * `adminranking <point> <number>`<br>
 指定したポイントの任意のランキングまでの一覧を表示します。

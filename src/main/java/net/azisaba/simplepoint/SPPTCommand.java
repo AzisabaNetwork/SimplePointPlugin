@@ -166,6 +166,7 @@ public class SPPTCommand implements CommandExecutor {
                     sender.sendMessage("§c使用法: /sppt info <グループ名> <チームID>");
                     return true;
                 }
+
                 showAdminInfo(sender, args[1], args[2]);
                 break;
 
@@ -182,13 +183,20 @@ public class SPPTCommand implements CommandExecutor {
                     sender.sendMessage("§c使用法: /sppt leave <グループ> <チーム> <プレイヤー名>");
                     return true;
                 }
-                Player leaveTarget = Bukkit.getPlayer(args[3]);
-                if (leaveTarget == null) {
-                    sender.sendMessage("§cプレイヤーが見つかりません。");
-                    return true;
+
+
+                String rawName = args[3];
+                if (rawName.contains(" ")) {
+                    rawName = rawName.split(" ")[0]; // 空白より前を取得
                 }
+                String targetName = ChatColor.stripColor(rawName); // 色情報を除去
+
+                // プレイヤーを取得 (オフライン対応)
+                org.bukkit.OfflinePlayer leaveTarget = Bukkit.getOfflinePlayer(targetName);
+
+
                 plugin.getTeamManager().removeMember(args[1], args[2], leaveTarget.getUniqueId());
-                sender.sendMessage("§a" + leaveTarget.getName() + " をチーム §l" + args[2] + " §aから脱退させました。");
+                sender.sendMessage("§a" + targetName + " をチーム §l" + args[2] + " §aから脱退させました。");
                 break;
 
             case "finishvsmode":

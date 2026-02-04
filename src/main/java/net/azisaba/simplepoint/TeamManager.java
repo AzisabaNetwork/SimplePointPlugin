@@ -90,6 +90,20 @@ public class TeamManager {
         return result;
     }
 
+
+    public List<String> getMemberNamesOnly(String group, String teamId) {
+        File memberFile = getMemberFile(group, teamId);
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(memberFile);
+        List<String> uuids = cfg.getStringList("members");
+        List<String> names = new ArrayList<>();
+        for (String s : uuids) {
+            // UUIDから純粋な名前だけを取得（装飾を入れない！）
+            String name = Bukkit.getOfflinePlayer(UUID.fromString(s)).getName();
+            if (name != null) names.add(name);
+        }
+        return names;
+    }
+
     // --- ポイント同期 (倍率適用) ---
     public void syncPoint(UUID uuid, String pointId, int amount) {
         File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
@@ -268,9 +282,21 @@ public class TeamManager {
     /**
      * プレイヤーが所属しているチームIDを取得
      */
+    // TeamManager.java 内の所属確認を強化
     public String getPlayerTeam(UUID uuid) {
-        String group = getPlayerGroup(uuid);
-        return (group == null) ? null : getPlayerTeam(group, uuid);
+        File teamDir = new File(plugin.getDataFolder(), "teams/team");
+        if (!teamDir.exists()) return null;
+
+        for (File groupDir : teamDir.listFiles()) {
+            if (!groupDir.isDirectory()) continue;
+            for (File teamFile : groupDir.listFiles()) {
+                FileConfiguration cfg = YamlConfiguration.loadConfiguration(teamFile);
+                if (cfg.getStringList("members").contains(uuid.toString())) {
+                    return teamFile.getName().replace(".yml", ""); // チームIDを返す
+                }
+            }
+        }
+        return null;
     }
 
     // 内部用：特定のグループ内でチームを探す
@@ -300,8 +326,8 @@ public class TeamManager {
         members.remove(uuid.toString());
         cfg.set("members", members);
 
-        // 貢献度データも削除する場合（任意）
-        cfg.set("contributions." + uuid.toString(), null);
+        // 貢献度データも削除する
+        //cfg.set("contributions." + uuid.toString(), null);
 
         try {
             cfg.save(memberFile);

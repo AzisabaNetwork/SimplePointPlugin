@@ -1,5 +1,7 @@
 package net.azisaba.simplepoint;
 
+import net.azisaba.simplepoint.PointAddEvent; // パッケージ名に合わせて適宜修正してください
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -42,6 +44,7 @@ public class PointManager {
             file.createNewFile();
             FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
             cfg.set("_settings.ranking_enabled", true);
+            cfg.set("_settings.function_enabled", true);
             cfg.save(file);
 
             // 表示名を保存
@@ -52,7 +55,7 @@ public class PointManager {
     }
 
     /**
-     * 表示名を取得 (&を§に変換)
+     * 表示名を取得 (&を§に変換) - RGB対応が必要な場合は TeamManager.formatName と同様の処理を推奨
      */
     public String getDisplayName(String id) {
         String name = namesConfig.getString(id, id);
@@ -83,11 +86,6 @@ public class PointManager {
         } catch (IOException e) { e.printStackTrace(); }
     }
 
-    // 互換用メソッド
-    public void saveConfig(String id, FileConfiguration cfg) {
-        savePointConfig(id);
-    }
-
     public int getPoint(String id, UUID uuid) {
         FileConfiguration cfg = getPointConfig(id);
         return cfg != null ? cfg.getInt(uuid.toString() + ".current", 0) : 0;
@@ -98,6 +96,9 @@ public class PointManager {
         return cfg != null ? cfg.getInt(uuid.toString() + ".total", 0) : 0;
     }
 
+    /**
+     * ポイントの加算
+     */
     public void addPoint(String id, UUID uuid, int amount) {
         FileConfiguration cfg = getPointConfig(id);
         if (cfg == null) return;
@@ -110,6 +111,16 @@ public class PointManager {
             cfg.set(uuid.toString() + ".total", total + amount);
         }
         savePointConfig(id);
+
+        // --- 重要: 2倍加算の修正 ---
+        // ここで plugin.getTeamManager().syncPoint() を呼ぶと、
+        // 下記の Event を経由して Listener 側でも syncPoint が呼ばれるため、2回加算されてしまいます。
+        // リスナー(PointSyncListener)を用意している場合は、ここでの syncPoint 呼び出しは不要です。
+
+        // --- カスタムイベントの呼び出し ---
+        // Listener 側で TeamManager.syncPoint(uuid, id, amount) が実行されるようにします。
+        PointAddEvent event = new PointAddEvent(uuid, id, amount);
+        Bukkit.getPluginManager().callEvent(event);
     }
 
     public void setPoint(String id, UUID uuid, int amount) {

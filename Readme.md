@@ -29,7 +29,7 @@
   指定したプレイヤーのポイントを閲覧します。
 * `ranking <point>`  
   指定したポイントのランキング（上位7名）を**全体チャット**に表示します。
-* `userrunk <point> <number>`<br>
+* `userrank <point> <number>`<br>
     指定したポイントの任意のランキングのプレイヤーが誰かを検索します。
 * `adminranking <point> <number>`<br>
 指定したポイントの任意のランキングまでの一覧を表示します。

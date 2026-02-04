@@ -284,13 +284,20 @@ public class TeamManager {
         return null;
     }
 
+
     /**
-     * チームの現在のポイントを取得
+     * チームの現在のポイントを取得する際のガード
      */
     public int getTeamPoints(String group, String teamId) {
-        File file = getTeamFile(group, teamId);
-        if (!file.exists()) return 0;
-        return YamlConfiguration.loadConfiguration(file).getInt("points.current", 0);
+        String pointId = getLinkedPointId(group);
+        if (pointId == null) {
+            // ここで画像のエラーメッセージを送信している可能性があります
+            return 0;
+        }
+
+        File teamFile = getTeamFile(group, teamId);
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(teamFile);
+        return cfg.getInt("points.current", 0);
     }
 
     /**
@@ -438,6 +445,16 @@ public class TeamManager {
             }
         }
         return null;
+    }
+
+    public String getLinkedPointId(String group) {
+        // グループ設定ファイル (teams/reward/グループ名.yml) から連携ポイントIDを読み込む
+        File file = getRewardFile(group);
+        if (!file.exists()) return null;
+
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        // 修正: ここが null だと画像のエラーになります
+        return cfg.getString("linked_point");
     }
 
     public File getTeamFile(String group, String teamId) { return new File(plugin.getDataFolder(), "teams/team/" + group + "/" + teamId + ".yml"); }

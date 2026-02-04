@@ -22,10 +22,10 @@ public class SPPTCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        // 短縮コマンド /teaminfo または /spt teaminfo (引数なし) で実行された場合
+        // 短縮コマンド /teaminfo への対応
         if (label.equalsIgnoreCase("teaminfo") || (label.equalsIgnoreCase("spt") && args.length > 0 && args[0].equalsIgnoreCase("teaminfo"))) {
             if (!(sender instanceof Player)) {
-                sender.sendMessage("§cこのコマンドはプレイヤーのみ実行可能です。");
+                sender.sendMessage("§cプレイヤーのみ実行可能です。");
                 return true;
             }
             sendModernTeamInfo((Player) sender);
@@ -41,38 +41,53 @@ public class SPPTCommand implements CommandExecutor {
 
         switch (sub) {
             case "create":
-                if (args.length < 2) return false;
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /sppt create <グループ名>");
+                    return true;
+                }
                 plugin.getTeamManager().createGroup(args[1]);
-                sender.sendMessage("§a[SPPT] グループ §l" + args[1] + " §aを作成しました。");
+                sender.sendMessage("§aグループ §l" + args[1] + " §aを作成しました。");
                 break;
 
             case "teamcreate":
-                if (args.length < 4) return false;
+                if (args.length < 4) {
+                    sender.sendMessage("§c使用法: /sppt teamcreate <グループ名> <チームID> <表示名>");
+                    return true;
+                }
                 plugin.getTeamManager().createTeam(args[1], args[2], args[3]);
-                sender.sendMessage("§a[SPPT] チーム §l" + args[3] + " §aを作成しました。");
+                sender.sendMessage("§aチーム §l" + args[3] + " §aを作成しました。");
                 break;
 
             case "join":
-                if (args.length < 4) return false;
+                if (args.length < 4) {
+                    sender.sendMessage("§c使用法: /sppt join <グループ名> <チームID> <プレイヤー名>");
+                    return true;
+                }
                 Player target = Bukkit.getPlayer(args[3]);
                 if (target == null) {
-                    sender.sendMessage("§c[SPPT] プレイヤーが見つかりません。");
+                    sender.sendMessage("§cプレイヤーが見つかりません。");
                     return true;
                 }
                 plugin.getTeamManager().addMember(args[1], args[2], target.getUniqueId());
-                sender.sendMessage("§a[SPPT] " + target.getName() + " を §l" + args[2] + " §aに追加しました。");
+                sender.sendMessage("§a" + target.getName() + " を §l" + args[2] + " §aに追加しました。");
                 break;
 
             case "setpoint":
-                if (args.length < 3) return false;
+                if (args.length < 3) {
+                    sender.sendMessage("§c使用法: /sppt setpoint <グループ名> <ポイントID>");
+                    return true;
+                }
                 plugin.getTeamManager().setGroupPoint(args[1], args[2]);
-                sender.sendMessage("§a[SPPT] グループ §l" + args[1] + " §aをポイント §l" + args[2] + " §aに紐付けました。");
+                sender.sendMessage("§aグループ §l" + args[1] + " §aをポイント §l" + args[2] + " §aに紐付けました。");
                 break;
 
             case "toggle":
-                if (args.length < 2) return false;
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /sppt toggle <グループ名>");
+                    return true;
+                }
                 boolean newState = plugin.getTeamManager().toggleGroupSync(args[1]);
-                sender.sendMessage("§a[SPPT] グループ §l" + args[1] + " §aのポイント同期を §l" + (newState ? "§bON" : "§cOFF") + " §aにしました。");
+                sender.sendMessage("§aグループ §l" + args[1] + " §aのポイント同期を §l" + (newState ? "§bON" : "§cOFF") + " §aにしました。");
                 break;
 
             case "multiplier":
@@ -83,15 +98,17 @@ public class SPPTCommand implements CommandExecutor {
                 try {
                     double mult = Double.parseDouble(args[2]);
                     plugin.getTeamManager().setGroupMultiplier(args[1], mult, args[3], args[4]);
-                    sender.sendMessage("§a[SPPT] 倍率を設定しました。");
+                    sender.sendMessage("§a倍率を設定しました。");
                 } catch (Exception e) {
                     sender.sendMessage("§cエラー: " + e.getMessage());
                 }
                 break;
 
             case "vsteam":
-                if (args.length < 4) return false;
-                // 重複チェック
+                if (args.length < 4) {
+                    sender.sendMessage("§c使用法: /sppt vsteam <グループ名> <チームID1> <チームID2>");
+                    return true;
+                }
                 File rewardFile = plugin.getTeamManager().getRewardFile(args[1]);
                 if (rewardFile.exists() && YamlConfiguration.loadConfiguration(rewardFile).getBoolean("battle.active")) {
                     sender.sendMessage("§c[!] このグループは既に対戦モードが開始されています。");
@@ -101,54 +118,72 @@ public class SPPTCommand implements CommandExecutor {
                 sender.sendMessage("§6§l[BATTLE] §fグループ §b" + args[1] + " §fで §e" + args[2] + " vs " + args[3] + " §fが開始されました！");
                 break;
 
-            case "teaminfo": // /sppt teaminfo としても動くように
+            case "teaminfo":
             case "moderninfo":
                 if (!(sender instanceof Player)) return true;
                 sendModernTeamInfo((Player) sender);
                 break;
 
             case "setjoingui":
-                if (args.length < 6) return false;
+                if (args.length < 6) {
+                    sender.sendMessage("§c使用法: /sppt setjoingui <グループ> <T1> <T2> <Mode: choice/random> <Auto: true/false>");
+                    return true;
+                }
                 boolean auto = Boolean.parseBoolean(args[5]);
                 plugin.getTeamJoinGUIManager().setGuiSettings(args[1], args[2], args[3], args[4], auto);
-                sender.sendMessage("§a[GUI] 参加GUIを設定しました。 (Mode: " + args[4] + ", Auto: " + auto + ")");
+                sender.sendMessage("§a参加GUIを設定しました。 (Mode: " + args[4] + ", Auto: " + auto + ")");
                 break;
 
             case "teamjoingui":
-                if (args.length < 2) return false;
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /sppt teamjoingui <グループ名> [プレイヤー名]");
+                    return true;
+                }
                 Player targetPlayer;
                 if (args.length >= 3) {
                     targetPlayer = Bukkit.getPlayer(args[2]);
                 } else {
-                    if (!(sender instanceof Player)) return false;
+                    if (!(sender instanceof Player)) return true;
                     targetPlayer = (Player) sender;
                 }
                 if (targetPlayer != null) plugin.getTeamJoinGUIManager().openJoinGUI(targetPlayer, args[1]);
                 break;
 
             case "member":
-                if (args.length < 3) return false;
+                if (args.length < 3) {
+                    sender.sendMessage("§c使用法: /sppt member <グループ名> <チームID>");
+                    return true;
+                }
                 showTeamMembers(sender, args[1], args[2]);
                 break;
 
             case "info":
-                if (args.length < 3) return false;
+                if (args.length < 3) {
+                    sender.sendMessage("§c使用法: /sppt info <グループ名> <チームID>");
+                    return true;
+                }
                 showAdminInfo(sender, args[1], args[2]);
                 break;
 
             case "setpoint_value":
-                if (args.length < 4) return false;
+                if (args.length < 4) {
+                    sender.sendMessage("§c使用法: /sppt setpoint_value <グループ名> <チームID> <数値>");
+                    return true;
+                }
                 handleSetPointValue(sender, args[1], args[2], args[3]);
                 break;
 
             case "rewardgui":
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /sppt rewardgui <グループ名>");
+                    return true;
+                }
                 if (!(sender instanceof Player)) return true;
-                if (args.length < 2) return false;
                 plugin.getTeamAdminGUIManager().openGroupRewardEditor((Player) sender, args[1]);
                 break;
 
             default:
-                sender.sendMessage("§c不明なコマンドです。/sppt help を参照してください。");
+                sender.sendMessage("§c不明なコマンドです。 /sppt help を参照してください。");
                 break;
         }
         return true;

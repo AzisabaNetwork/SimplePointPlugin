@@ -55,6 +55,71 @@ public class PointManager {
     }
 
     /**
+     * 累計(total)を減らさずに、現在の所持ポイント(points)のみを減算します。
+     */
+    public void takePoint(String pointId, UUID uuid, int amount) {
+        File file = getPointFile(pointId, uuid);
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+
+        // 現在のポイントを取得 (キー名は既存の保存形式に合わせて 'points' または 'current' に修正してください)
+        int current = cfg.getInt("points", 0);
+
+        // 新しい値を設定 (マイナスにならないよう Math.max を使用)
+        cfg.set("points", Math.max(0, current - amount));
+
+        try {
+            cfg.save(file);
+        } catch (IOException e) {
+            plugin.getLogger().severe("ポイントの保存中にエラーが発生しました: " + file.getName());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 指定されたポイントIDとUUIDに対応するファイルオブジェクトを取得します。
+     * @param pointId ポイントの種類 (例: event_point)
+     * @param uuid プレイヤーのUUID
+     * @return ファイルオブジェクト
+     */
+    public File getPointFile(String pointId, UUID uuid) {
+        // フォルダ構成: plugins/SimplePoint/points/pointId/uuid.yml
+        File dir = new File(plugin.getDataFolder(), "points/" + pointId);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        return new File(dir, uuid.toString() + ".yml");
+    }
+
+    /**
+     * 指定されたポイントIDにおける全プレイヤーの累計スコアをMapで取得します。
+     * @param pointId ポイントの識別ID
+     * @return UUIDと累計ポイントのマップ
+     */
+    public Map<UUID, Integer> getAllTotalPoints(String pointId) {
+        Map<UUID, Integer> map = new HashMap<>();
+        File pointDir = new File(plugin.getDataFolder(), "points/" + pointId);
+
+        if (!pointDir.exists() || !pointDir.isDirectory()) return map;
+
+        File[] files = pointDir.listFiles((dir, name) -> name.endsWith(".yml"));
+        if (files == null) return map;
+
+        for (File file : files) {
+            try {
+                String uuidStr = file.getName().replace(".yml", "");
+                UUID uuid = UUID.fromString(uuidStr);
+                FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+                // 累計ポイント(total)を取得
+                int total = cfg.getInt("total", 0);
+                map.put(uuid, total);
+            } catch (Exception ignored) {
+                // 不正なファイル名はスキップ
+            }
+        }
+        return map;
+    }
+
+    /**
      * 表示名を取得 (&を§に変換) - RGB対応が必要な場合は TeamManager.formatName と同様の処理を推奨
      */
     public String getDisplayName(String id) {

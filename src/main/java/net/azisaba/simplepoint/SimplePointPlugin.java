@@ -8,6 +8,7 @@ public class SimplePointPlugin extends JavaPlugin {
     private RewardManager rewardManager;
     private GUIManager guiManager;
     private LogManager logManager;
+    private SPPTCommand spptCommand;
     private TeamManager teamManager;
     private TeamAdminGUIManager teamAdminGUIManager;
     private TeamGUIManager teamGUIManager;
@@ -33,6 +34,7 @@ public class SimplePointPlugin extends JavaPlugin {
         this.teamAdminGUIManager = new TeamAdminGUIManager(this);
         this.guiManager = new GUIManager(this);
         this.teamJoinGUIManager = new TeamJoinGUIManager(this);
+        this.spptCommand = new SPPTCommand(this);
 
         // 3. イベントの登録
         getServer().getPluginManager().registerEvents(guiManager, this);
@@ -46,6 +48,7 @@ public class SimplePointPlugin extends JavaPlugin {
 
         // --- コマンド登録 ---
         registerCommands();
+        getCommand("sppt").setExecutor(this.spptCommand);
 
         getLogger().info("SimplePointPlugin v1.3 Enabled! 🚀");
     }
@@ -85,6 +88,9 @@ public class SimplePointPlugin extends JavaPlugin {
     public TeamGUIManager getTeamGUIManager() { return teamGUIManager; }
     public TeamJoinGUIManager getTeamJoinGUIManager() {
         return teamJoinGUIManager;
+    }
+    public SPPTCommand getSPPTCommand() {
+        return spptCommand;
     }
 
     public void reloadAllConfig() {

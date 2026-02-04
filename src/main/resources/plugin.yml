@@ -20,4 +20,4 @@ commands:
     usage: /ranking <id>
   teaminfo:
     description: Check your points quickly
-    usage: /myp <group> <team>
+    usage: /teaminfo <group> <team>

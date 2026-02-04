@@ -284,6 +284,28 @@ public class TeamManager {
         return null;
     }
 
+    /**
+     * 指定したプレイヤーをチームから脱退させます
+     */
+    public void removeMember(String group, String teamId, UUID uuid) {
+        File memberFile = getMemberFile(group, teamId);
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(memberFile);
+
+        // メンバーリストから削除
+        List<String> members = cfg.getStringList("members");
+        members.remove(uuid.toString());
+        cfg.set("members", members);
+
+        // 貢献度データも削除する場合（任意）
+        cfg.set("contributions." + uuid.toString(), null);
+
+        try {
+            cfg.save(memberFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     /**
      * チームの現在のポイントを取得する際のガード

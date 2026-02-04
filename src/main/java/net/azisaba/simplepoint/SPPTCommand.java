@@ -10,6 +10,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -173,6 +174,36 @@ public class SPPTCommand implements CommandExecutor {
                 handleSetPointValue(sender, args[1], args[2], args[3]);
                 break;
 
+            case "leave":
+                if (args.length < 4) {
+                    sender.sendMessage("§c使用法: /sppt leave <グループ> <チーム> <プレイヤー名>");
+                    return true;
+                }
+                Player leaveTarget = Bukkit.getPlayer(args[3]);
+                if (leaveTarget == null) {
+                    sender.sendMessage("§cプレイヤーが見つかりません。");
+                    return true;
+                }
+                plugin.getTeamManager().removeMember(args[1], args[2], leaveTarget.getUniqueId());
+                sender.sendMessage("§a" + leaveTarget.getName() + " をチーム §l" + args[2] + " §aから脱退させました。");
+                break;
+
+            case "finishvsmode":
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /sppt finishvsmode <グループ名>");
+                    return true;
+                }
+                File vFile = plugin.getTeamManager().getRewardFile(args[1]);
+                FileConfiguration vCfg = YamlConfiguration.loadConfiguration(vFile);
+                vCfg.set("battle.active", false);
+                try {
+                    vCfg.save(vFile);
+                    sender.sendMessage("§aグループ §l" + args[1] + " §aの対戦モードを終了しました。");
+                } catch (IOException e) {
+                    sender.sendMessage("§cエラーが発生しました。");
+                }
+                break;
+
             case "rewardgui":
                 if (args.length < 2) {
                     sender.sendMessage("§c使用法: /sppt rewardgui <グループ名>");
@@ -225,6 +256,7 @@ public class SPPTCommand implements CommandExecutor {
      */
     public void sendModernTeamInfo(Player player) {
         UUID uuid = player.getUniqueId();
+        // 判定を teamManager の最新の所属取得ロジックに合わせる
         String group = plugin.getTeamManager().getPlayerGroup(uuid);
         String teamId = plugin.getTeamManager().getPlayerTeam(uuid);
 

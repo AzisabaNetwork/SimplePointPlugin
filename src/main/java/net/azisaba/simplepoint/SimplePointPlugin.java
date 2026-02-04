@@ -11,6 +11,7 @@ public class SimplePointPlugin extends JavaPlugin {
     private TeamManager teamManager;
     private TeamAdminGUIManager teamAdminGUIManager;
     private TeamGUIManager teamGUIManager;
+    private TeamJoinGUIManager teamJoinGUIManager;
 
     @Override
     public void onEnable() {
@@ -31,6 +32,7 @@ public class SimplePointPlugin extends JavaPlugin {
         this.logManager = new LogManager(this);
         this.teamAdminGUIManager = new TeamAdminGUIManager(this);
         this.guiManager = new GUIManager(this);
+        this.teamJoinGUIManager = new TeamJoinGUIManager(this);
 
         // 3. イベントの登録
         getServer().getPluginManager().registerEvents(guiManager, this);
@@ -79,6 +81,9 @@ public class SimplePointPlugin extends JavaPlugin {
     public TeamManager getTeamManager() { return teamManager; }
     public TeamAdminGUIManager getTeamAdminGUIManager() { return teamAdminGUIManager; }
     public TeamGUIManager getTeamGUIManager() { return teamGUIManager; }
+    public TeamJoinGUIManager getTeamJoinGUIManager() {
+        return teamJoinGUIManager;
+    }
 
     public void reloadAllConfig() {
         reloadConfig();

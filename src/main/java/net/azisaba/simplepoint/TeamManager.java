@@ -212,6 +212,8 @@ public class TeamManager {
         try { cfg.save(file); } catch (IOException e) { e.printStackTrace(); }
     }
 
+
+
     // --- 統計学的なチーム割り振りロジック ---
     public String getRandomTeam(String group, String t1, String t2) {
         int n1 = getMemberNames(group, t1).size();
@@ -241,6 +243,99 @@ public class TeamManager {
             return "§c[終了済]";
         }
     }
+
+    /**
+     * プレイヤーが所属しているグループIDを取得
+     */
+    public String getPlayerGroup(UUID uuid) {
+        File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
+        File[] files = rewardDir.listFiles();
+        if (files == null) return null;
+
+        for (File f : files) {
+            String group = f.getName().replace(".yml", "");
+            if (getPlayerTeam(group, uuid) != null) return group;
+        }
+        return null;
+    }
+
+    /**
+     * プレイヤーが所属しているチームIDを取得
+     */
+    public String getPlayerTeam(UUID uuid) {
+        String group = getPlayerGroup(uuid);
+        return (group == null) ? null : getPlayerTeam(group, uuid);
+    }
+
+    // 内部用：特定のグループ内でチームを探す
+    private String getPlayerTeam(String group, UUID uuid) {
+        File teamDir = new File(plugin.getDataFolder(), "teams/members/" + group);
+        File[] files = teamDir.listFiles();
+        if (files == null) return null;
+
+        for (File f : files) {
+            FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
+            if (cfg.getStringList("members").contains(uuid.toString())) {
+                return f.getName().replace(".yml", "");
+            }
+        }
+        return null;
+    }
+
+    /**
+     * チームの現在のポイントを取得
+     */
+    public int getTeamPoints(String group, String teamId) {
+        File file = getTeamFile(group, teamId);
+        if (!file.exists()) return 0;
+        return YamlConfiguration.loadConfiguration(file).getInt("points.current", 0);
+    }
+
+    /**
+     * 個人の累計貢献ポイントを取得
+     */
+    public int getMemberTotal(String group, String teamId, UUID uuid) {
+        File file = getMemberFile(group, teamId);
+        if (!file.exists()) return 0;
+        return YamlConfiguration.loadConfiguration(file).getInt("contributions." + uuid.toString(), 0);
+    }
+
+    /**
+     * チーム内での貢献ランキング順位を取得
+     */
+    public int getMemberRank(String group, String teamId, UUID uuid) {
+        File file = getMemberFile(group, teamId);
+        if (!file.exists()) return 1;
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+
+        // 全メンバーのスコアをリスト化してソート
+        Map<String, Integer> scores = new HashMap<>();
+        if (cfg.getConfigurationSection("contributions") == null) return 1;
+
+        for (String key : cfg.getConfigurationSection("contributions").getKeys(false)) {
+            scores.put(key, cfg.getInt("contributions." + key));
+        }
+
+        List<Map.Entry<String, Integer>> list = new ArrayList<>(scores.entrySet());
+        list.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).getKey().equals(uuid.toString())) return i + 1;
+        }
+        return list.size();
+    }
+
+    /**
+     * 対戦（バトル）を開始状態にする
+     */
+//    public void startBattle(String group, String t1, String t2) {
+//        File file = getRewardFile(group);
+//        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+//        cfg.set("battle.active", true);
+//        cfg.set("battle.team1", t1);
+//        cfg.set("battle.team2", t2);
+//        try { cfg.save(file); } catch (IOException e) { e.printStackTrace(); }
+//    }
     private String formatTime(long millis) {
         long minutes = (millis / 1000) / 60;
         long hours = minutes / 60;

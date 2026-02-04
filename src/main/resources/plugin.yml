@@ -18,3 +18,6 @@ commands:
   ranking:
     description: Check the ranking quickly
     usage: /ranking <id>
+  teaminfo:
+    description: Check your points quickly
+    usage: /myp <group> <team>

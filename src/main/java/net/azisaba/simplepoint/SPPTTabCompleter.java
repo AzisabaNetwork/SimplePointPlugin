@@ -52,6 +52,8 @@ public class SPPTTabCompleter implements TabCompleter {
             return completions;
         }
 
+
+
         // 第4引数: プレイヤー名
         if (args.length == 4) {
             if (sub.equals("join")) {

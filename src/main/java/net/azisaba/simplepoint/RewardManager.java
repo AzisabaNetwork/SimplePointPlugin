@@ -2,6 +2,7 @@ package net.azisaba.simplepoint;
 
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import java.io.File;
@@ -20,6 +21,30 @@ public class RewardManager {
         if (!rewardFolder.exists()) {
             rewardFolder.mkdirs();
         }
+    }
+
+    /**
+     * ポイントを差し引く (同期対応)
+     */
+    public boolean takePoints(Player player, String pointId, int amount) {
+        String group = plugin.getTeamManager().getPlayerGroup(player.getUniqueId());
+
+        // 同期が有効ならチームポイントから差し引く
+        if (group != null && plugin.getTeamManager().isSyncEnabled(group)) {
+            String teamId = plugin.getTeamManager().getPlayerTeam(player.getUniqueId());
+            int teamPoints = plugin.getTeamManager().getTeamPoints(group, teamId);
+            if (teamPoints < amount) return false;
+
+            plugin.getTeamManager().addTeamPoints(group, teamId, -amount);
+            return true;
+        }
+
+        // 同期が無効なら個人ポイントから差し引く
+        int personalPoints = plugin.getPointManager().getPoint(pointId, player.getUniqueId());
+        if (personalPoints < amount) return false;
+
+        plugin.getPointManager().addPoint(pointId, player.getUniqueId(), -amount);
+        return true;
     }
 
     public FileConfiguration getRewardConfig(String pointId) {
@@ -41,11 +66,6 @@ public class RewardManager {
         return config;
     }
 
-    /**
-     * 報酬アイテムを保存します
-     * @param pointId ポイントの内部ID
-     * @param isPersonal 個人制限モードなら true, 共有在庫モードなら false
-     */
     public void saveReward(String pointId, int slot, ItemStack item, int price, int stock, boolean isPersonal) {
         FileConfiguration config = getRewardConfig(pointId);
         String path = String.valueOf(slot);

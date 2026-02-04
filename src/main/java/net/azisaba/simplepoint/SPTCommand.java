@@ -117,16 +117,26 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
         int current = tm.getTeamCurrentPoint(group, teamId);
         int total = tm.getTeamTotalPoint(group, teamId);
         int contribution = tm.getContribution(group, teamId, p.getUniqueId());
+        // 修正点: チームごとの倍率情報を取得
+        String multStatus = tm.getTeamMultiplierStatus(group, teamId);
 
         p.sendMessage("§8§m-------§r " + teamName + " §6§lTEAM STATUS §8§m-------");
         p.sendMessage("§7現在のチームポイント: §e" + current + " pt");
         p.sendMessage("§7累計獲得スコア: §a" + total + " pt");
+        p.sendMessage("§7適用中の倍率: " + multStatus);
 
+        // 目標達成率の表示
         int goal = YamlConfiguration.loadConfiguration(tm.getTeamFile(group, teamId)).getInt("goal_point", 100000);
-        double percent = Math.min(100.0, (double) total / goal * 100);
+        double percent = Math.min(100.0, (double) total / (goal > 0 ? goal : 1) * 100);
         p.sendMessage("§f目標達成率: " + createProgressBar(percent) + " §e" + String.format("%.1f", percent) + "%");
-        p.sendMessage("§7あなたの貢献度: §b" + contribution + " pt");
 
+        p.sendMessage("");
+        p.sendMessage("§e§l▶ §fあなたの貢献データ");
+        p.sendMessage("  §7貢献度スコア: §b" + contribution + " pt");
+        p.sendMessage("  §7貢献ランク: §6" + tm.getMemberRank(group, teamId, p.getUniqueId()) + "位");
+
+        p.sendMessage("");
+        p.sendMessage("§f所属メンバー (貢献度):");
         List<String> memberNames = new ArrayList<>();
         FileConfiguration memberCfg = YamlConfiguration.loadConfiguration(tm.getMemberFile(group, teamId));
         for (String uuidStr : memberCfg.getStringList("members")) {
@@ -138,10 +148,10 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 int c = tm.getContribution(group, teamId, uuid);
                 memberNames.add("§f" + name + " §7(§b" + c + "§7)");
             } else {
-                memberNames.add("§7" + name);
+                memberNames.add("§7" + name + " §8(非公開)");
             }
         }
-        p.sendMessage("§f所属メンバー: " + String.join("§r, ", memberNames));
+        p.sendMessage(" " + String.join("§r, ", memberNames));
         p.sendMessage("§8§m--------------------------------------");
         p.playSound(p.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1f);
     }
@@ -152,7 +162,6 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
             return;
         }
         String group = args[1];
-        // 修正: 引数を2つに変更 (TeamGUIManager の定義に合わせる)
         plugin.getTeamGUIManager().openTeamRewardGUI(p, group);
     }
 
@@ -170,15 +179,16 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
         p.sendMessage("§e/spt myp <ID> §7- 個人のポイント確認");
         p.sendMessage("§e/spt reward <ID> §7- 報酬ショップ");
         p.sendMessage("§e/spt ranking <ID> §7- ランキング表示");
+        p.sendMessage("");
         p.sendMessage("§6§l[TEAM]");
-        p.sendMessage("§e/spt teaminfo <Group> §7- チーム情報・貢献度");
-        p.sendMessage("§e/spt teamreward <Group> §7- チーム報酬");
+        p.sendMessage("§e/spt teaminfo <Group> §7- 所属チームの詳細確認");
+        p.sendMessage("§e/spt teamreward <Group> §7- チーム報酬ショップ");
         p.sendMessage("§e/spt toggleteamstats §7- 貢献度の公開/非公開切替");
         p.sendMessage("§8§m----------------------------");
     }
 
     private void showPersonalRanking(Player player, String pointId) {
-        // ランキング表示ロジック
+        player.sendMessage("§cランキング機能は現在メンテナンス中です。");
     }
 
     @Override

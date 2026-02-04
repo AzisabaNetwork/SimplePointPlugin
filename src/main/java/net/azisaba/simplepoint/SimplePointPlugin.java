@@ -38,6 +38,8 @@ public class SimplePointPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(guiManager, this);
         getServer().getPluginManager().registerEvents(new TeamAdminGUIListener(this), this);
         getServer().getPluginManager().registerEvents(teamGUIManager, this);
+        getServer().getPluginManager().registerEvents(teamJoinGUIManager, this);
+
 
         // ★ 追加: 個人ポイント獲得をチームに同期させるリスナー
         getServer().getPluginManager().registerEvents(new PointSyncListener(this), this);

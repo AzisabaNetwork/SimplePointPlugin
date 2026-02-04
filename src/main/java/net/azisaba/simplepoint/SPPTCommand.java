@@ -91,11 +91,18 @@ public class SPPTCommand implements CommandExecutor {
 
             case "vsteam":
                 if (args.length < 4) return false;
+                // 重複チェック
+                File rewardFile = plugin.getTeamManager().getRewardFile(args[1]);
+                if (rewardFile.exists() && YamlConfiguration.loadConfiguration(rewardFile).getBoolean("battle.active")) {
+                    sender.sendMessage("§c[!] このグループは既に対戦モードが開始されています。");
+                    return true;
+                }
                 plugin.getTeamManager().startBattle(args[1], args[2], args[3]);
                 sender.sendMessage("§6§l[BATTLE] §fグループ §b" + args[1] + " §fで §e" + args[2] + " vs " + args[3] + " §fが開始されました！");
                 break;
 
             case "teaminfo": // /sppt teaminfo としても動くように
+            case "moderninfo":
                 if (!(sender instanceof Player)) return true;
                 sendModernTeamInfo((Player) sender);
                 break;
@@ -157,6 +164,7 @@ public class SPPTCommand implements CommandExecutor {
             }
             FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
             cfg.set("points.current", amount);
+            // setpoint_valueの際は、意図的な修正なのでtotalも合わせる
             cfg.set("points.total", amount);
             cfg.save(file);
             sender.sendMessage("§aチームポイントを §e" + amount + " §aに設定しました。");
@@ -202,11 +210,11 @@ public class SPPTCommand implements CommandExecutor {
 
         int myPoints = plugin.getTeamManager().getTeamPoints(group, teamId);
         int enemyPoints = plugin.getTeamManager().getTeamPoints(group, enemyId);
-        double multiplier = plugin.getTeamManager().getActiveMultiplier(group);
+        double multiplier = plugin.getTeamManager().getTeamActiveMultiplier(group, teamId);
 
         String progressBar = buildVSBar(myPoints, enemyPoints);
 
-        // --- TOP3 取得ロジックの埋め込み ---
+        // --- TOP3 取得ロジック ---
         File memberFile = plugin.getTeamManager().getMemberFile(group, teamId);
         FileConfiguration mCfg = YamlConfiguration.loadConfiguration(memberFile);
         Map<String, Integer> scores = new HashMap<>();
@@ -225,7 +233,6 @@ public class SPPTCommand implements CommandExecutor {
                 })
                 .collect(Collectors.toList());
 
-        // --- チャット表示出力 ---
         player.sendMessage("§8§m      §r §b§lVS BATTLE STATUS §r §8§m      ");
         player.sendMessage("");
         player.sendMessage(" §f" + plugin.getTeamManager().getTeamDisplayName(group, teamId) + " §b§l" + myPoints + " pt");
@@ -248,10 +255,11 @@ public class SPPTCommand implements CommandExecutor {
     private String buildVSBar(int p1, int p2) {
         int total = p1 + p2;
         if (total == 0) return "§7[§8----------§f|§8----------§7]";
+        // p1(自分のチーム)が左側、p2(敵チーム)が右側
         int ratio = (int) (((double) p1 / total) * 20);
-        StringBuilder sb = new StringBuilder("§b");
+        StringBuilder sb = new StringBuilder("§b"); // 自分のチームの色
         for (int i = 0; i < 20; i++) {
-            if (i == 10) sb.append("§f|§e");
+            if (i == 10) sb.append("§f|§e"); // 中央のセパレータと敵チームの色
             sb.append(i < ratio ? "■" : "□");
         }
         return "§7[" + sb.toString() + "§7] " + (p1 >= p2 ? "§b§l← ADVANTAGE" : "§e§lDISADVANTAGE →");
@@ -269,12 +277,24 @@ public class SPPTCommand implements CommandExecutor {
         String dName = plugin.getTeamManager().formatName(teamCfg.getString("display_name"));
         int memberCount = memCfg.getStringList("members").size();
 
+        // 対戦相手の情報取得
+        File rewardFile = plugin.getTeamManager().getRewardFile(group);
+        FileConfiguration gCfg = YamlConfiguration.loadConfiguration(rewardFile);
+
         sender.sendMessage("§8§m----------§r §6Team Admin Info §8§m----------");
         sender.sendMessage("§7表示名: " + dName);
         sender.sendMessage("§7メンバー数: §f" + memberCount + " 名");
-        sender.sendMessage("§7現在のポイント: §e" + teamCfg.getInt("points.current") + " pt");
+        sender.sendMessage("§7現在の保持ポイント: §e" + teamCfg.getInt("points.current") + " pt");
         sender.sendMessage("§7累計ポイント: §a" + teamCfg.getInt("points.total") + " pt");
-        sender.sendMessage("§7現在の倍率: " + plugin.getTeamManager().getMultiplierStatus(group));
+        sender.sendMessage("§7現在の倍率: " + plugin.getTeamManager().getTeamMultiplierStatus(group, teamId));
+
+        if (gCfg.getBoolean("battle.active")) {
+            String t1 = gCfg.getString("battle.team1");
+            String t2 = gCfg.getString("battle.team2");
+            String enemyId = teamId.equals(t1) ? t2 : t1;
+            sender.sendMessage("§c§lVS §7対戦相手: §e" + enemyId + " §8(§f" + plugin.getTeamManager().getTeamPoints(group, enemyId) + " pt§8)");
+        }
+
         sender.sendMessage("§8§m------------------------------------");
     }
 

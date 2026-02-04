@@ -9,6 +9,8 @@ import org.bukkit.inventory.ItemStack;
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -228,21 +230,21 @@ public class TeamManager {
         }
         return Math.random() < 0.5 ? t1 : t2;
     }
-    public String getMultiplierStatus(String group) {
-        FileConfiguration cfg = YamlConfiguration.loadConfiguration(getRewardFile(group));
-        long now = System.currentTimeMillis();
-        long start = cfg.getLong("multiplier_start", 0);
-        long end = cfg.getLong("multiplier_end", 0);
-        double val = cfg.getDouble("multiplier", 1.0);
-
-        if (now < start) {
-            return "§7[待機中] §f開始まで: §e" + formatTime(start - now);
-        } else if (now <= end) {
-            return "§a[発動中] §b" + val + "倍 §f(終了まで: §e" + formatTime(end - now) + "§f)";
-        } else {
-            return "§c[終了済]";
-        }
-    }
+//    public String getMultiplierStatus(String group) {
+//        FileConfiguration cfg = YamlConfiguration.loadConfiguration(getRewardFile(group));
+//        long now = System.currentTimeMillis();
+//        long start = cfg.getLong("multiplier_start", 0);
+//        long end = cfg.getLong("multiplier_end", 0);
+//        double val = cfg.getDouble("multiplier", 1.0);
+//
+//        if (now < start) {
+//            return "§7[待機中] §f開始まで: §e" + formatTime(start - now);
+//        } else if (now <= end) {
+//            return "§a[発動中] §b" + val + "倍 §f(終了まで: §e" + formatTime(end - now) + "§f)";
+//        } else {
+//            return "§c[終了済]";
+//        }
+//    }
 
     /**
      * プレイヤーが所属しているグループIDを取得
@@ -323,6 +325,87 @@ public class TeamManager {
             if (list.get(i).getKey().equals(uuid.toString())) return i + 1;
         }
         return list.size();
+    }
+
+    /**
+     * ポイント同期が有効かどうかを返す (RewardManagerで使用)
+     */
+    public boolean isSyncEnabled(String group) {
+        File rewardFile = getRewardFile(group);
+        if (!rewardFile.exists()) return false;
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(rewardFile);
+        return cfg.getBoolean("sync_enabled", false);
+    }
+
+    /**
+     * チームポイントを増減させる (購入時などに使用)
+     * プレイヤーを指定しない単純な加減算用
+     */
+    public void addTeamPoints(String group, String teamId, int amount) {
+        File file = getTeamFile(group, teamId);
+        if (!file.exists()) return;
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        int current = cfg.getInt("points.current", 0);
+        cfg.set("points.current", current + amount);
+        try { cfg.save(file); } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    public double getTeamActiveMultiplier(String group, String teamId) {
+        File file = getTeamFile(group, teamId);
+        if (!file.exists()) return 1.0;
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+
+        double mult = cfg.getDouble("multiplier.value", 1.0);
+        String startStr = cfg.getString("multiplier.start");
+        String endStr = cfg.getString("multiplier.end");
+
+        if (startStr == null || endStr == null) return 1.0;
+
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd-HH:mm");
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime start = LocalDateTime.parse(startStr, formatter);
+            LocalDateTime end = LocalDateTime.parse(endStr, formatter);
+
+            if (now.isAfter(start) && now.isBefore(end)) {
+                return mult;
+            }
+        } catch (Exception e) {
+            return 1.0;
+        }
+        return 1.0;
+    }
+
+    /**
+     * 管理画面等で表示するための倍率ステータス文字列を取得
+     */
+    public String getTeamMultiplierStatus(String group, String teamId) {
+        double activeMult = getTeamActiveMultiplier(group, teamId);
+        if (activeMult <= 1.0) return "§7なし (1.0x)";
+
+        File file = getTeamFile(group, teamId);
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        return "§d§l" + activeMult + "x §7(" + cfg.getString("multiplier.end") + " まで)";
+    }
+
+    /**
+     * 以前の形式との互換用 (グループ全体の倍率)
+     */
+    public String getMultiplierStatus(String group) {
+        return "§7チーム別設定を参照";
+    }
+
+    /**
+     * チームごとの倍率設定メソッド (倍率をチームごとに変更するため)
+     */
+    public void setTeamMultiplier(String group, String teamId, double multiplier, String start, String end) {
+        File file = getTeamFile(group, teamId);
+        if (!file.exists()) return;
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        cfg.set("multiplier.value", multiplier);
+        cfg.set("multiplier.start", start);
+        cfg.set("multiplier.end", end);
+        try { cfg.save(file); } catch (Exception e) { e.printStackTrace(); }
     }
 
     /**

@@ -37,7 +37,7 @@ public class TeamJoinGUIManager implements Listener {
             FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
             if (cfg.getBoolean("gui.auto_show", false)) {
                 String group = f.getName().replace(".yml", "");
-                // すでにそのグループに参加しているかチェック
+                // playerGroupがnull（どこにも未所属）の場合のみ表示
                 if (plugin.getTeamManager().getPlayerGroup(player.getUniqueId()) == null) {
                     Bukkit.getScheduler().runTaskLater(plugin, () -> openJoinGUI(player, group), 20L);
                     break;
@@ -49,7 +49,7 @@ public class TeamJoinGUIManager implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         String title = event.getView().getTitle();
-        // 判定用の識別子。表示名が含まれるため startsWith で判定
+        // 判定用文字列が含まれているかチェック
         if (!title.contains("Team Join:")) return;
 
         event.setCancelled(true);
@@ -59,18 +59,18 @@ public class TeamJoinGUIManager implements Listener {
 
         Player player = (Player) event.getWhoClicked();
 
-        // タイトルからグループIDを特定（非表示の識別子などを使わない場合、メタデータ等が必要ですが、
-        // 今回は開く際に渡された情報に基づいて再取得ロジックを構成します）
-        // ここでは、現在開いているGUIの「元のグループID」を特定するために、開いているインベントリの下部などにIDを隠すか、
-        // タイトルの末尾に不可視の文字を入れるのが一般的ですが、簡易的に rewardDir からマッチングします。
+        // タイトルから装飾を除去した名前を利用してグループIDを特定
         String groupId = null;
         File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
-        for (File f : rewardDir.listFiles()) {
-            String id = f.getName().replace(".yml", "");
-            String dName = getGroupDisplayName(id);
-            if (title.contains(ChatColor.stripColor(dName))) {
-                groupId = id;
-                break;
+        File[] files = rewardDir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                String id = f.getName().replace(".yml", "");
+                String dName = ChatColor.stripColor(getGroupDisplayName(id));
+                if (ChatColor.stripColor(title).contains(dName)) {
+                    groupId = id;
+                    break;
+                }
             }
         }
 
@@ -83,41 +83,44 @@ public class TeamJoinGUIManager implements Listener {
         String selectedTeam = null;
         int slot = event.getRawSlot();
 
-        if (slot == 11) selectedTeam = t1;
-        else if (slot == 15) selectedTeam = t2;
-        else if (slot == 13 && clicked.getType() == Material.NETHER_STAR) {
+        if (slot == 11) {
+            selectedTeam = t1;
+        } else if (slot == 15) {
+            selectedTeam = t2;
+        } else if (slot == 13 && clicked.getType() == Material.NETHER_STAR) {
             selectedTeam = determineRandomTeam(groupId, t1, t2);
         }
 
         if (selectedTeam != null) {
+            // 重複チェック付きの加入処理を呼び出し
             handleGuiClick(player, groupId, selectedTeam);
         }
     }
 
     /**
-     * 重複参加チェックと加入処理の統合
+     * 加入処理 (重複ガード付き)
      */
     public void handleGuiClick(Player player, String group, String teamId) {
         UUID uuid = player.getUniqueId();
         String currentGroup = plugin.getTeamManager().getPlayerGroup(uuid);
 
-        // すでにそのグループ内のどれかのチームに参加している場合
+        // すでにこのグループのいずれかのチームに参加している場合
         if (currentGroup != null && currentGroup.equalsIgnoreCase(group)) {
             player.sendMessage("§c§l[!] §7あなたはすでにこのグループのチームに参加しています。");
             player.closeInventory();
             return;
         }
 
-        // 参加処理
+        // 加入処理を実行
         plugin.getTeamManager().addMember(group, teamId, uuid);
         player.sendMessage("§a§l[!] §fチーム §b" + teamId + " §fに参加しました！");
         player.closeInventory();
     }
 
     public void openJoinGUI(Player player, String group) {
-        // 重複チェック
+        // 開く直前にもチェック
         if (plugin.getTeamManager().getPlayerGroup(player.getUniqueId()) != null) {
-            player.sendMessage("§cすでにこのグループのチームに参加しています。");
+            player.sendMessage("§cすでにチームに参加しているため、GUIを開けません。");
             return;
         }
 
@@ -130,17 +133,19 @@ public class TeamJoinGUIManager implements Listener {
         if (t1 == null || t2 == null) return;
 
         Inventory inv = Bukkit.createInventory(null, 27, "§0Team Join: " + groupDisplayName);
+
         if (mode.equalsIgnoreCase("choice")) {
             inv.setItem(11, createGuiItem(Material.BLUE_BANNER, "§b§l" + t1 + " §fに参加", "§7クリックして加入"));
             inv.setItem(15, createGuiItem(Material.RED_BANNER, "§c§l" + t2 + " §fに参加", "§7クリックして加入"));
         } else {
-            inv.setItem(13, createGuiItem(Material.NETHER_STAR, "§f§lランダム参加", "§7統計的に均等なチームへ割り振られます"));
+            inv.setItem(13, createGuiItem(Material.NETHER_STAR, "§f§lランダム参加", "§7統計的に人数が少ない方のチームへ", "§7自動的に割り振られます。"));
         }
+
         player.openInventory(inv);
     }
 
     /**
-     * グループの表示名を取得（装飾対応）
+     * グループの表示名を取得し、カラーコードを変換して返す
      */
     private String getGroupDisplayName(String group) {
         File file = plugin.getTeamManager().getRewardFile(group);
@@ -150,16 +155,26 @@ public class TeamJoinGUIManager implements Listener {
         return ChatColor.translateAlternateColorCodes('&', name);
     }
 
+    /**
+     * 統計的に均等になるようランダムでチームを決定
+     */
     public String determineRandomTeam(String group, String t1, String t2) {
         int n1 = plugin.getTeamManager().getMemberNames(group, t1).size();
         int n2 = plugin.getTeamManager().getMemberNames(group, t2).size();
         int total = n1 + n2;
 
+        // サンプル数がある程度ある場合、不均衡があれば補正
         if (total >= 10) {
-            double p = 0.5, expected = total * p, sd = Math.sqrt(total * p * (1 - p));
+            double p = 0.5;
+            double expected = total * p;
+            double sd = Math.sqrt(total * p * (1 - p));
             double z = (Math.abs(n1 - expected) - 0.5) / sd;
-            if (z > 1.96) return (n1 > n2) ? t2 : t1;
+
+            if (z > 1.96) { // 有意差がある場合
+                return (n1 > n2) ? t2 : t1;
+            }
         }
+        // それ以外は純粋な50%
         return (Math.random() < 0.5) ? t1 : t2;
     }
 
@@ -170,7 +185,11 @@ public class TeamJoinGUIManager implements Listener {
         cfg.set("gui.team2", t2);
         cfg.set("gui.mode", mode);
         cfg.set("gui.auto_show", autoShow);
-        try { cfg.save(file); } catch (IOException e) { e.printStackTrace(); }
+        try {
+            cfg.save(file);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private ItemStack createGuiItem(Material material, String name, String... lore) {

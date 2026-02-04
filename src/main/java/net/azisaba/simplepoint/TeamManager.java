@@ -43,13 +43,17 @@ public class TeamManager {
     }
 
     // --- グループ・チーム作成 ---
-    public void createGroup(String group) {
-        File teamDir = new File(plugin.getDataFolder(), "teams/team/" + group);
-        File memberDir = new File(plugin.getDataFolder(), "teams/member/" + group);
-        File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
-        if (!teamDir.exists()) teamDir.mkdirs();
-        if (!memberDir.exists()) memberDir.mkdirs();
-        if (!rewardDir.exists()) rewardDir.mkdirs();
+    public void createGroup(String group, String displayName) {
+        File file = getRewardFile(group);
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        cfg.set("display_name", displayName); // 表示名を保存
+        try {
+            cfg.save(file);
+            // フォルダ作成も念のため
+            new File(plugin.getDataFolder(), "teams/team/" + group).mkdirs();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void createTeam(String group, String teamId, String displayName) {

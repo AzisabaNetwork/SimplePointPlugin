@@ -1,6 +1,7 @@
 package net.azisaba.simplepoint;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -42,12 +43,14 @@ public class SPPTCommand implements CommandExecutor {
 
         switch (sub) {
             case "create":
-                if (args.length < 2) {
-                    sender.sendMessage("§c使用法: /sppt create <グループ名>");
+                if (args.length < 3) {
+                    sender.sendMessage("§c使用法: /sppt create <ID> <表示名(カラーコード可)>");
                     return true;
                 }
-                plugin.getTeamManager().createGroup(args[1]);
-                sender.sendMessage("§aグループ §l" + args[1] + " §aを作成しました。");
+                // args[2] を表示名として渡す
+                plugin.getTeamManager().createGroup(args[1], args[2]);
+                sender.sendMessage("§aグループ §l" + args[1] + " §aを名称 §r" +
+                        ChatColor.translateAlternateColorCodes('&', args[2]) + " §aで作成しました。");
                 break;
 
             case "teamcreate":

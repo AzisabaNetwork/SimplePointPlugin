@@ -23,7 +23,7 @@ public class SPPTTabCompleter implements TabCompleter {
         if (args.length == 1) {
             StringUtil.copyPartialMatches(args[0], Arrays.asList(
                     "create", "teamcreate", "join", "setpoint", "setpoint_value",
-                    "info", "rewardgui", "toggle", "multiplier", "member", "delete", "help"
+                    "info", "rewardgui", "toggle", "multiplier", "member", "delete", "help","vsteam","moderninfo","teamjoingui","setjoingui"
             ), completions);
             return completions;
         }
@@ -43,7 +43,7 @@ public class SPPTTabCompleter implements TabCompleter {
         if (args.length == 3) {
             if (sub.equals("setpoint")) {
                 completions.addAll(plugin.getPointManager().getPointNames());
-            } else if (Arrays.asList("join", "info", "member", "delete", "setpoint_value", "teamcreate").contains(sub)) {
+            } else if (Arrays.asList("join", "info", "member", "delete", "setpoint_value", "teamcreate","vsteam","moderninfo","teamjoingui","setjoingui").contains(sub)) {
                 File groupDir = new File(plugin.getDataFolder(), "teams/team/" + args[1]);
                 if (groupDir.exists() && groupDir.list() != null) {
                     for (String f : groupDir.list()) completions.add(f.replace(".yml", ""));

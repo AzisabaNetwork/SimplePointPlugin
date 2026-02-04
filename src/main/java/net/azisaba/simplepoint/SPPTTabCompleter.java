@@ -1,6 +1,7 @@
 package net.azisaba.simplepoint;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
@@ -63,9 +64,17 @@ public class SPPTTabCompleter implements TabCompleter {
             }
 
             if (sub.equals("leave")) {
-                // そのチームに実際にいるメンバーを補完
-                List<String> members = plugin.getTeamManager().getMemberNames(args[1], args[2]);
-                return StringUtil.copyPartialMatches(args[3], members, completions);
+                if (args.length == 3) {
+                    return StringUtil.copyPartialMatches(args[2], getTeams(args[1]), completions);
+                }
+                if (args.length == 4) {
+                    // 修正：装飾やポイントを含まない「純粋な名前」のリストを取得
+                    List<String> memberNames = new ArrayList<>();
+                    for (String name : plugin.getTeamManager().getMemberNames(args[1], args[2])) {
+                        memberNames.add(ChatColor.stripColor(name).split(" ")[0]);
+                    }
+                    return StringUtil.copyPartialMatches(args[3], memberNames, completions);
+                }
             }
         }
 

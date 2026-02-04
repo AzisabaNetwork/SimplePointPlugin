@@ -30,6 +30,8 @@ public class TeamJoinGUIManager implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) != null) return;
+
         File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
         File[] files = rewardDir.listFiles();
         if (files == null) return;
@@ -38,8 +40,8 @@ public class TeamJoinGUIManager implements Listener {
             FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
             if (cfg.getBoolean("gui.auto_show", false)) {
                 String group = f.getName().replace(".yml", "");
-                // 修正：既にどこかのチームに所属しているなら自動表示しない
-                if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) == null) {
+                // グループ単位でもチェック
+                if (plugin.getTeamManager().getPlayerGroup(player.getUniqueId()) == null) {
                     Bukkit.getScheduler().runTaskLater(plugin, () -> openJoinGUI(player, group), 20L);
                     break;
                 }
@@ -58,8 +60,6 @@ public class TeamJoinGUIManager implements Listener {
         if (clicked == null || clicked.getType() == Material.AIR) return;
 
         Player player = (Player) event.getWhoClicked();
-
-        // 装飾を剥がしてグループIDを特定
         String groupId = null;
         File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
         File[] files = rewardDir.listFiles();
@@ -67,6 +67,7 @@ public class TeamJoinGUIManager implements Listener {
             for (File f : files) {
                 String id = f.getName().replace(".yml", "");
                 String dName = ChatColor.stripColor(getGroupDisplayName(id));
+                // タイトル（色付き）から色を剥いでIDを特定
                 if (ChatColor.stripColor(title).contains(dName)) {
                     groupId = id;
                     break;
@@ -83,9 +84,11 @@ public class TeamJoinGUIManager implements Listener {
         String selectedTeam = null;
         int slot = event.getRawSlot();
 
-        if (slot == 11) selectedTeam = t1;
-        else if (slot == 15) selectedTeam = t2;
-        else if (slot == 13 && clicked.getType() == Material.NETHER_STAR) {
+        if (slot == 11) {
+            selectedTeam = t1;
+        } else if (slot == 15) {
+            selectedTeam = t2;
+        } else if (slot == 13 && clicked.getType() == Material.NETHER_STAR) {
             selectedTeam = determineRandomTeam(groupId, t1, t2);
         }
 
@@ -96,27 +99,23 @@ public class TeamJoinGUIManager implements Listener {
 
     public void handleGuiClick(Player player, String group, String teamId) {
         UUID uuid = player.getUniqueId();
-        // どこかのチームに既に入っていたら拒否
+        // 参加処理直前の最終所属チェック
         if (plugin.getTeamManager().getPlayerTeam(uuid) != null) {
-            player.sendMessage("§c§l[!] §7あなたは既にチームに参加しているため、操作をキャンセルしました。");
+            player.sendMessage("§c§l[!] §7エラー：あなたは既にチームに参加しています。");
             player.closeInventory();
             return;
         }
 
         plugin.getTeamManager().addMember(group, teamId, uuid);
 
-        // 参加音を鳴らす
-        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+        // 参加音
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
         player.sendMessage("§a§l[!] §fチーム §b" + teamId + " §fに参加しました！");
         player.closeInventory();
     }
 
     public void openJoinGUI(Player player, String group) {
-        // 所属済みなら開かない
-        if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) != null) {
-            player.sendMessage("§c既にチームに参加しています。");
-            return;
-        }
+        if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) != null) return;
 
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(plugin.getTeamManager().getRewardFile(group));
         String mode = cfg.getString("gui.mode", "choice");
@@ -144,6 +143,9 @@ public class TeamJoinGUIManager implements Listener {
         return ChatColor.translateAlternateColorCodes('&', name);
     }
 
+    /**
+     * 高度なランダム判定 (以前のロジックを完全復元)
+     */
     public String determineRandomTeam(String group, String t1, String t2) {
         int n1 = plugin.getTeamManager().getMemberNames(group, t1).size();
         int n2 = plugin.getTeamManager().getMemberNames(group, t2).size();

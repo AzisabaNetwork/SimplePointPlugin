@@ -163,8 +163,25 @@ public class TeamManager {
     public int getContribution(String group, String teamId, UUID uuid) { return YamlConfiguration.loadConfiguration(getMemberFile(group, teamId)).getInt("scores." + uuid.toString(), 0); }
 
     public String getTeamDisplayName(String group, String teamId) {
-        FileConfiguration cfg = YamlConfiguration.loadConfiguration(getTeamFile(group, teamId));
-        return formatName(cfg.getString("display_name", teamId));
+        File file = new File(plugin.getDataFolder(), "teams/team/" + group + "/" + teamId + ".yml");
+        if (!file.exists()) return teamId;
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        String name = cfg.getString("display_name", teamId);
+        return ChatColor.translateAlternateColorCodes('&', name);
+    }
+
+    public double getTeamTotalPoints(String group, String teamId) {
+        File memberFile = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
+        if (!memberFile.exists()) return 0.0;
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(memberFile);
+
+        double total = 0;
+        if (cfg.contains("contributions")) {
+            for (String key : cfg.getConfigurationSection("contributions").getKeys(false)) {
+                total += cfg.getDouble("contributions." + key);
+            }
+        }
+        return total;
     }
 
     // --- 公開設定系 (再追加) ---
@@ -265,72 +282,81 @@ public class TeamManager {
 //    }
 
     /**
-     * プレイヤーが所属しているグループIDを取得
+     * プレイヤーが現在所属しているグループ名を取得します。
      */
     public String getPlayerGroup(UUID uuid) {
-        File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
-        File[] files = rewardDir.listFiles();
-        if (files == null) return null;
+        File memberBaseDir = new File(plugin.getDataFolder(), "teams/member");
+        if (!memberBaseDir.exists()) return null;
 
-        for (File f : files) {
-            String group = f.getName().replace(".yml", "");
-            if (getPlayerTeam(group, uuid) != null) return group;
-        }
-        return null;
-    }
+        File[] groupDirs = memberBaseDir.listFiles(File::isDirectory);
+        if (groupDirs == null) return null;
 
-    /**
-     * プレイヤーが所属しているチームIDを取得
-     */
-    // TeamManager.java 内の所属確認を強化
-    public String getPlayerTeam(UUID uuid) {
-        File teamDir = new File(plugin.getDataFolder(), "teams/team");
-        if (!teamDir.exists()) return null;
+        for (File gDir : groupDirs) {
+            File[] teamFiles = gDir.listFiles((dir, name) -> name.endsWith(".yml"));
+            if (teamFiles == null) continue;
 
-        for (File groupDir : teamDir.listFiles()) {
-            if (!groupDir.isDirectory()) continue;
-            for (File teamFile : groupDir.listFiles()) {
-                FileConfiguration cfg = YamlConfiguration.loadConfiguration(teamFile);
+            for (File tFile : teamFiles) {
+                FileConfiguration cfg = YamlConfiguration.loadConfiguration(tFile);
                 if (cfg.getStringList("members").contains(uuid.toString())) {
-                    return teamFile.getName().replace(".yml", ""); // チームIDを返す
+                    return gDir.getName(); // フォルダ名（グループ名）を返す
                 }
             }
         }
         return null;
     }
 
-    // 内部用：特定のグループ内でチームを探す
-    private String getPlayerTeam(String group, UUID uuid) {
-        File teamDir = new File(plugin.getDataFolder(), "teams/members/" + group);
-        File[] files = teamDir.listFiles();
-        if (files == null) return null;
 
-        for (File f : files) {
-            FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
-            if (cfg.getStringList("members").contains(uuid.toString())) {
-                return f.getName().replace(".yml", "");
+    // 内部用：特定のグループ内でチームを探す
+    /**
+     * プレイヤーが所属しているチームIDを、/teams/member/ 内のファイルから走査します。
+     */
+    public String getPlayerTeam(UUID uuid) {
+        // パスを /teams/member/グループ名/チーム名.yml に合わせる
+        File memberBaseDir = new File(plugin.getDataFolder(), "teams/member");
+        if (!memberBaseDir.exists()) return null;
+
+        File[] groupDirs = memberBaseDir.listFiles(File::isDirectory);
+        if (groupDirs == null) return null;
+
+        for (File gDir : groupDirs) {
+            File[] teamFiles = gDir.listFiles((dir, name) -> name.endsWith(".yml"));
+            if (teamFiles == null) continue;
+
+            for (File tFile : teamFiles) {
+                FileConfiguration cfg = YamlConfiguration.loadConfiguration(tFile);
+                List<String> members = cfg.getStringList("members");
+                if (members.contains(uuid.toString())) {
+                    return tFile.getName().replace(".yml", "");
+                }
             }
         }
         return null;
     }
 
     /**
-     * 指定したプレイヤーをチームから脱退させます
+     * 脱退処理：指定した場所のファイルからUUIDを削除します。
      */
     public void removeMember(String group, String teamId, UUID uuid) {
-        File memberFile = getMemberFile(group, teamId);
-        FileConfiguration cfg = YamlConfiguration.loadConfiguration(memberFile);
+        // 修正されたパス: teams/member/グループ名/チーム名.yml
+        File groupDir = new File(plugin.getDataFolder(), "teams/member/" + group);
+        File file = new File(groupDir, teamId + ".yml");
 
-        // メンバーリストから削除
+        if (!file.exists()) return;
+
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
         List<String> members = cfg.getStringList("members");
+
+        // UUIDをリストから削除
         members.remove(uuid.toString());
         cfg.set("members", members);
 
-        // 貢献度データも削除する
-        //cfg.set("contributions." + uuid.toString(), null);
+        // 貢献度データ(contributions)もリセットする場合
+        if (cfg.contains("contributions." + uuid.toString())) {
+            cfg.set("contributions." + uuid.toString(), null);
+        }
 
         try {
-            cfg.save(memberFile);
+            cfg.save(file);
         } catch (IOException e) {
             e.printStackTrace();
         }

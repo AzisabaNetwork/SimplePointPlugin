@@ -373,7 +373,7 @@ public class SPPTCommand implements CommandExecutor {
 
             player.sendMessage("§8§m      §r " + groupDisplay + " §b§lVS STATUS §r §8§m      ");
             player.sendMessage("");
-            player.sendMessage(" §f" + teamDisplay + " §b§l" + myTeamTotal + " pt §7(" + memberCount + "人) " + (myTeamTotal >= enemyTotal ? "§b§lWINNING" : ""));
+            player.sendMessage(" §f" + teamDisplay + " §b§l" + myTeamTotal + " pt §7(" + memberCount + "人) " );
             player.sendMessage(" " + buildVSBar(myTeamTotal, enemyTotal));
             player.sendMessage(" §f" + plugin.getTeamManager().getTeamDisplayName(group, enemyId) + " §e§l" + enemyTotal + " pt §7(" + enemyCount + "人)");
         } else {

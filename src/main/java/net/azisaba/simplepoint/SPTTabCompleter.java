@@ -25,7 +25,7 @@ public class SPTTabCompleter implements TabCompleter {
 
         // 1. サブコマンドの補完: /spt <サブコマンド>
         if (args.length == 1) {
-            List<String> subCommands = Arrays.asList("myp", "reward", "ranking", "teaminfo", "teamreward", "toggleteamstats", "help");
+            List<String> subCommands = Arrays.asList("myp", "reward", "ranking", "teaminfo", "teamreward", "help");
             StringUtil.copyPartialMatches(args[0], subCommands, completions);
         }
 

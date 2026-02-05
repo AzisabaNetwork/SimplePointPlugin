@@ -174,9 +174,9 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
         p.sendMessage("§e/spt ranking <ID> §7- ランキング表示");
         p.sendMessage("");
         p.sendMessage("§6§l[TEAM]");
-        p.sendMessage("§e/teaminfo §7- 現在の対戦状況・チーム詳細");
+        p.sendMessage("§e/teaminfo <Group> §7- 現在の対戦状況・チーム詳細");
         p.sendMessage("§e/spt teamreward <Group> §7- チーム報酬");
-        p.sendMessage("§e/spt toggleteamstats §7- 貢献度の公開/非公開切替");
+        //p.sendMessage("§e/spt toggleteamstats §7- 貢献度の公開/非公開切替");
         p.sendMessage("§8§m----------------------------");
     }
 

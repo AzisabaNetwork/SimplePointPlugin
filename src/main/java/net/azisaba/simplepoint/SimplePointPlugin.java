@@ -50,7 +50,7 @@ public class SimplePointPlugin extends JavaPlugin {
         registerCommands();
         getCommand("sppt").setExecutor(this.spptCommand);
 
-        getLogger().info("SimplePointPlugin v1.3 Enabled! 🚀");
+        getLogger().info("SimplePointPlugin v2.0 Enabled! 🚀");
     }
 
     private void registerCommands() {

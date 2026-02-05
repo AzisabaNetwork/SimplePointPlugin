@@ -277,23 +277,107 @@ public class SPPTCommand implements CommandExecutor {
     /**
      * モダンなチーム対戦状況表示
      */
+//    public void sendModernTeamInfo(Player player) {
+//        UUID uuid = player.getUniqueId();
+//        // 1. 自分が実際に所属している「グループ名」と「チームID」を物理ファイルから特定
+//        String group = plugin.getTeamManager().getPlayerGroup(uuid);
+//        String teamId = plugin.getTeamManager().getPlayerTeam(uuid);
+//
+//        if (group == null || teamId == null) {
+//            player.sendMessage("§c§l[!] §7所属データが見つかりません。");
+//            return;
+//        }
+//
+//        FileConfiguration gCfg = YamlConfiguration.loadConfiguration(plugin.getTeamManager().getRewardFile(group));
+//        String groupDisplay = getGroupDisplayName(group); // 下記メソッド参照
+//        String teamDisplay = plugin.getTeamManager().getTeamDisplayName(group, teamId);
+//
+//        // 2. 所属チームの統計取得
+//        int myTeamPoints = plugin.getTeamManager().getTeamPoints(group, teamId);
+//        int teamMemberCount = plugin.getTeamManager().getMemberNames(group, teamId).size();
+//        double multiplier = plugin.getTeamManager().getTeamActiveMultiplier(group, teamId);
+//
+//        // --- 表示開始 ---
+//        if (gCfg.getBoolean("battle.active", false)) {
+//            // VSモード表示
+//            String t1 = gCfg.getString("battle.team1");
+//            String t2 = gCfg.getString("battle.team2");
+//            String enemyId = teamId.equals(t1) ? t2 : t1;
+//            int enemyPoints = plugin.getTeamManager().getTeamPoints(group, enemyId);
+//            String enemyDisplay = plugin.getTeamManager().getTeamDisplayName(group, enemyId);
+//
+//            player.sendMessage("§8§m      §r " + groupDisplay + " §b§lVS STATUS §r §8§m      ");
+//            player.sendMessage("");
+//            player.sendMessage(" §f" + teamDisplay + " §b§l" + myTeamPoints + " pt §7(" + teamMemberCount + "人)");
+//            player.sendMessage(" " + buildVSBar(myTeamPoints, enemyPoints));
+//            player.sendMessage(" §f" + enemyDisplay + " §e§l" + enemyPoints + " pt");
+//        } else {
+//            // 通常モード表示
+//            player.sendMessage("§8§m      §r " + groupDisplay + " §f§lTEAM INFO §r §8§m      ");
+//            player.sendMessage("");
+//            player.sendMessage(" §7所属チーム: " + teamDisplay);
+//            player.sendMessage(" §7チーム人数: §f" + teamMemberCount + " 名");
+//            player.sendMessage(" §7チーム総計: §e§l" + myTeamPoints + " pt");
+//        }
+//
+//        // --- TOP3 取得ロジック (保存場所: teams/member/グループ/チーム.yml) ---
+//        player.sendMessage("");
+//        player.sendMessage(" §e§l▶ §f§lTEAM TOP CONTRIBUTORS");
+//
+//        // 修正: 正しいファイルパスから読み込み
+//        File memberFile = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
+//        FileConfiguration mCfg = YamlConfiguration.loadConfiguration(memberFile);
+//        java.util.Map<String, Double> scores = new java.util.HashMap<>();
+//
+//        if (mCfg.contains("contributions")) {
+//            for (String key : mCfg.getConfigurationSection("contributions").getKeys(false)) {
+//                scores.put(key, mCfg.getDouble("contributions." + key));
+//            }
+//        }
+//
+//        if (scores.isEmpty()) {
+//            player.sendMessage(" §7(まだデータがありません)");
+//        } else {
+//            scores.entrySet().stream()
+//                    .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
+//                    .limit(3)
+//                    .forEach(e -> {
+//                        org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(UUID.fromString(e.getKey()));
+//                        String name = (op.getName() != null) ? op.getName() : "Unknown";
+//                        player.sendMessage(" §7- §f" + name + ": §e" + e.getValue().intValue() + "pt");
+//                    });
+//        }
+//
+//        // --- 個人統計 ---
+//        player.sendMessage("");
+//        player.sendMessage(" §e§l▶ §f§lYOUR STATS");
+//        player.sendMessage("  §7現在の保持: §f" + mCfg.getDouble("contributions." + uuid.toString(), 0) + " pt");
+//        player.sendMessage("  §7貢献ランク: §6" + plugin.getTeamManager().getMemberRank(group, teamId, uuid) + "位 §8| §7倍率: §d" + multiplier + "x");
+//        player.sendMessage("§8§m                                     ");
+//    }
+
     public void sendModernTeamInfo(Player player) {
         UUID uuid = player.getUniqueId();
+        // 1. 自分が実際に所属している「グループ名」と「チームID」を物理ファイルから特定
         String group = plugin.getTeamManager().getPlayerGroup(uuid);
         String teamId = plugin.getTeamManager().getPlayerTeam(uuid);
 
         if (group == null || teamId == null) {
-            player.sendMessage("§c§l[!] §7あなたはチームに参加していません。");
+            player.sendMessage("§c§l[!] §7所属データが見つかりません。");
             return;
         }
 
+        // 各種設定と表示名の取得
         FileConfiguration gCfg = YamlConfiguration.loadConfiguration(plugin.getTeamManager().getRewardFile(group));
         String groupDisplay = getGroupDisplayName(group);
         String teamDisplay = plugin.getTeamManager().getTeamDisplayName(group, teamId);
-        int myTeamTotalPoints = plugin.getTeamManager().getTeamPoints(group, teamId);
+
+        // チーム統計の取得
+        int myTeamPoints = plugin.getTeamManager().getTeamPoints(group, teamId);
+        int teamMemberCount = plugin.getTeamManager().getMemberNames(group, teamId).size();
         double multiplier = plugin.getTeamManager().getTeamActiveMultiplier(group, teamId);
 
-        // --- VSモード判定による表示の切り替え ---
+        // --- 表示メイン部分 ---
         if (gCfg.getBoolean("battle.active", false)) {
             // 【VSモード中の表示】
             String t1 = gCfg.getString("battle.team1");
@@ -301,58 +385,56 @@ public class SPPTCommand implements CommandExecutor {
             String enemyId = teamId.equals(t1) ? t2 : t1;
             int enemyPoints = plugin.getTeamManager().getTeamPoints(group, enemyId);
             String enemyDisplay = plugin.getTeamManager().getTeamDisplayName(group, enemyId);
-            String progressBar = buildVSBar(myTeamTotalPoints, enemyPoints);
 
             player.sendMessage("§8§m      §r " + groupDisplay + " §b§lVS STATUS §r §8§m      ");
             player.sendMessage("");
-            player.sendMessage(" §f" + teamDisplay + " §b§l" + myTeamTotalPoints + " pt");
-            player.sendMessage(" " + progressBar);
+            player.sendMessage(" §f" + teamDisplay + " §b§l" + myTeamPoints + " pt §7(" + teamMemberCount + "人)");
+            player.sendMessage(" " + buildVSBar(myTeamPoints, enemyPoints));
             player.sendMessage(" §f" + enemyDisplay + " §e§l" + enemyPoints + " pt");
         } else {
-            // 【通常時（非戦闘時）の表示】
+            // 【通常モード表示】
             player.sendMessage("§8§m      §r " + groupDisplay + " §f§lTEAM INFO §r §8§m      ");
             player.sendMessage("");
             player.sendMessage(" §7所属チーム: " + teamDisplay);
-            player.sendMessage(" §7チーム総計: §e§l" + myTeamTotalPoints + " pt");
+            player.sendMessage(" §7チーム人数: §f" + teamMemberCount + " 名");
+            player.sendMessage(" §7チーム総計: §e§l" + myTeamPoints + " pt");
         }
 
-        // --- TOP3 貢献者セクション (共通) ---
+        // --- TOP3 取得ロジック (scoresキー対応) ---
         player.sendMessage("");
         player.sendMessage(" §e§l▶ §f§lTEAM TOP CONTRIBUTORS");
 
-        File memberFile = plugin.getTeamManager().getMemberFile(group, teamId);
+        File memberFile = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
         FileConfiguration mCfg = YamlConfiguration.loadConfiguration(memberFile);
-        Map<String, Integer> scores = new HashMap<>();
-        if (mCfg.getConfigurationSection("contributions") != null) {
-            for (String key : mCfg.getConfigurationSection("contributions").getKeys(false)) {
-                scores.put(key, mCfg.getInt("contributions." + key));
+        java.util.Map<String, Integer> scoreMap = new java.util.HashMap<>();
+
+        if (mCfg.contains("scores")) {
+            for (String key : mCfg.getConfigurationSection("scores").getKeys(false)) {
+                scoreMap.put(key, mCfg.getInt("scores." + key));
             }
         }
 
-        if (scores.isEmpty()) {
+        if (scoreMap.isEmpty()) {
             player.sendMessage(" §7(まだデータがありません)");
         } else {
-            scores.entrySet().stream()
+            scoreMap.entrySet().stream()
                     .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
                     .limit(3)
                     .forEach(e -> {
-                        OfflinePlayer op = Bukkit.getOfflinePlayer(UUID.fromString(e.getKey()));
-                        player.sendMessage(" §7- §f" + (op.getName() != null ? op.getName() : "Unknown") + ": §e" + e.getValue() + "pt");
+                        org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(UUID.fromString(e.getKey()));
+                        String name = (op.getName() != null) ? op.getName() : "Unknown";
+                        player.sendMessage(" §7- §f" + name + ": §e" + e.getValue() + "pt");
                     });
         }
 
-        // --- 個人統計セクション (共通) ---
+        // --- 個人統計 ---
         player.sendMessage("");
         player.sendMessage(" §e§l▶ §f§lYOUR STATS");
-        player.sendMessage("  §7現在の保持: §f" + myTeamTotalPoints + " pt");
-        player.sendMessage("  §7総貢献量:   §a" + plugin.getTeamManager().getMemberTotal(group, teamId, uuid) + " pt");
+        player.sendMessage("  §7現在の保持: §f" + mCfg.getInt("scores." + uuid.toString(), 0) + " pt");
         player.sendMessage("  §7貢献ランク: §6" + plugin.getTeamManager().getMemberRank(group, teamId, uuid) + "位 §8| §7倍率: §d" + multiplier + "x");
         player.sendMessage("§8§m                                     ");
     }
 
-    /**
-     * グループの表示名を安全に取得するメソッド
-     */
     private String getGroupDisplayName(String group) {
         File file = plugin.getTeamManager().getRewardFile(group);
         if (!file.exists()) return "§f" + group;

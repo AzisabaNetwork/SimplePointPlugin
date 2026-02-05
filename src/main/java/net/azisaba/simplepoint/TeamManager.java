@@ -285,20 +285,14 @@ public class TeamManager {
      * プレイヤーが現在所属しているグループ名を取得します。
      */
     public String getPlayerGroup(UUID uuid) {
-        File memberBaseDir = new File(plugin.getDataFolder(), "teams/member");
-        if (!memberBaseDir.exists()) return null;
+        File memberDir = new File(plugin.getDataFolder(), "teams/member");
+        if (!memberDir.exists()) return null;
 
-        File[] groupDirs = memberBaseDir.listFiles(File::isDirectory);
-        if (groupDirs == null) return null;
-
-        for (File gDir : groupDirs) {
-            File[] teamFiles = gDir.listFiles((dir, name) -> name.endsWith(".yml"));
-            if (teamFiles == null) continue;
-
-            for (File tFile : teamFiles) {
-                FileConfiguration cfg = YamlConfiguration.loadConfiguration(tFile);
+        for (File groupDir : memberDir.listFiles(File::isDirectory)) {
+            for (File teamFile : groupDir.listFiles((dir, name) -> name.endsWith(".yml"))) {
+                FileConfiguration cfg = YamlConfiguration.loadConfiguration(teamFile);
                 if (cfg.getStringList("members").contains(uuid.toString())) {
-                    return gDir.getName(); // フォルダ名（グループ名）を返す
+                    return groupDir.getName(); // プレイヤーのUUIDが含まれるフォルダ名だけを返す
                 }
             }
         }

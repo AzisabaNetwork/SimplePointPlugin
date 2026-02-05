@@ -30,7 +30,10 @@ public class TeamJoinGUIManager implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) != null) return;
+
+        // 所属チェック（全走査）
+        String currentTeam = plugin.getTeamManager().getPlayerTeam(player.getUniqueId());
+        if (currentTeam != null) return;
 
         File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
         File[] files = rewardDir.listFiles();
@@ -40,11 +43,12 @@ public class TeamJoinGUIManager implements Listener {
             FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
             if (cfg.getBoolean("gui.auto_show", false)) {
                 String group = f.getName().replace(".yml", "");
-                // グループ単位でもチェック
-                if (plugin.getTeamManager().getPlayerGroup(player.getUniqueId()) == null) {
-                    Bukkit.getScheduler().runTaskLater(plugin, () -> openJoinGUI(player, group), 20L);
-                    break;
-                }
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) == null) {
+                        openJoinGUI(player, group);
+                    }
+                }, 20L);
+                break;
             }
         }
     }
@@ -55,7 +59,6 @@ public class TeamJoinGUIManager implements Listener {
         if (!title.contains("Team Join:")) return;
 
         event.setCancelled(true);
-
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR) return;
 
@@ -67,7 +70,6 @@ public class TeamJoinGUIManager implements Listener {
             for (File f : files) {
                 String id = f.getName().replace(".yml", "");
                 String dName = ChatColor.stripColor(getGroupDisplayName(id));
-                // タイトル（色付き）から色を剥いでIDを特定
                 if (ChatColor.stripColor(title).contains(dName)) {
                     groupId = id;
                     break;
@@ -84,11 +86,9 @@ public class TeamJoinGUIManager implements Listener {
         String selectedTeam = null;
         int slot = event.getRawSlot();
 
-        if (slot == 11) {
-            selectedTeam = t1;
-        } else if (slot == 15) {
-            selectedTeam = t2;
-        } else if (slot == 13 && clicked.getType() == Material.NETHER_STAR) {
+        if (slot == 11) selectedTeam = t1;
+        else if (slot == 15) selectedTeam = t2;
+        else if (slot == 13 && clicked.getType() == Material.NETHER_STAR) {
             selectedTeam = determineRandomTeam(groupId, t1, t2);
         }
 
@@ -99,23 +99,23 @@ public class TeamJoinGUIManager implements Listener {
 
     public void handleGuiClick(Player player, String group, String teamId) {
         UUID uuid = player.getUniqueId();
-        // 参加処理直前の最終所属チェック
         if (plugin.getTeamManager().getPlayerTeam(uuid) != null) {
-            player.sendMessage("§c§l[!] §7エラー：あなたは既にチームに参加しています。");
+            player.sendMessage("§c§l[!] §7エラー：既にチームに参加しています。");
             player.closeInventory();
             return;
         }
 
         plugin.getTeamManager().addMember(group, teamId, uuid);
-
-        // 参加音
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
         player.sendMessage("§a§l[!] §fチーム §b" + teamId + " §fに参加しました！");
         player.closeInventory();
     }
 
     public void openJoinGUI(Player player, String group) {
-        if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) != null) return;
+        if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) != null) {
+            player.sendMessage("§c既にチームに参加しているため、参加GUIは開けません。");
+            return;
+        }
 
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(plugin.getTeamManager().getRewardFile(group));
         String mode = cfg.getString("gui.mode", "choice");
@@ -130,7 +130,7 @@ public class TeamJoinGUIManager implements Listener {
             inv.setItem(11, createGuiItem(Material.BLUE_BANNER, "§b§l" + t1 + " §fに参加", "§7クリックして加入"));
             inv.setItem(15, createGuiItem(Material.RED_BANNER, "§c§l" + t2 + " §fに参加", "§7クリックして加入"));
         } else {
-            inv.setItem(13, createGuiItem(Material.NETHER_STAR, "§f§lランダム参加", "§7統計的に均等なチームへ割り振られます"));
+            inv.setItem(13, createGuiItem(Material.NETHER_STAR, "§f§lランダム参加", "§7均等なチームへ自動で割り振られます"));
         }
         player.openInventory(inv);
     }
@@ -143,24 +143,6 @@ public class TeamJoinGUIManager implements Listener {
         return ChatColor.translateAlternateColorCodes('&', name);
     }
 
-    /**
-     * 高度なランダム判定 (以前のロジックを完全復元)
-     */
-    public String determineRandomTeam(String group, String t1, String t2) {
-        int n1 = plugin.getTeamManager().getMemberNames(group, t1).size();
-        int n2 = plugin.getTeamManager().getMemberNames(group, t2).size();
-        int total = n1 + n2;
-
-        if (total >= 10) {
-            double p = 0.5;
-            double expected = total * p;
-            double sd = Math.sqrt(total * p * (1 - p));
-            double z = (Math.abs(n1 - expected) - 0.5) / sd;
-            if (z > 1.96) return (n1 > n2) ? t2 : t1;
-        }
-        return (Math.random() < 0.5) ? t1 : t2;
-    }
-
     public void setGuiSettings(String group, String t1, String t2, String mode, boolean autoShow) {
         File file = plugin.getTeamManager().getRewardFile(group);
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
@@ -169,6 +151,13 @@ public class TeamJoinGUIManager implements Listener {
         cfg.set("gui.mode", mode);
         cfg.set("gui.auto_show", autoShow);
         try { cfg.save(file); } catch (IOException e) { e.printStackTrace(); }
+    }
+
+    public String determineRandomTeam(String group, String t1, String t2) {
+        int n1 = plugin.getTeamManager().getMemberNames(group, t1).size();
+        int n2 = plugin.getTeamManager().getMemberNames(group, t2).size();
+        if (n1 == n2) return Math.random() < 0.5 ? t1 : t2;
+        return (n1 < n2) ? t1 : t2;
     }
 
     private ItemStack createGuiItem(Material material, String name, String... lore) {

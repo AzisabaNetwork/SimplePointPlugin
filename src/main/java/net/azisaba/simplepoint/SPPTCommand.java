@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static sun.audio.AudioPlayer.player;
+
 public class SPPTCommand implements CommandExecutor {
     private final SimplePointPlugin plugin;
 
@@ -24,13 +26,30 @@ public class SPPTCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        // 短縮コマンド /teaminfo への対応
-        if (label.equalsIgnoreCase("teaminfo") || (label.equalsIgnoreCase("spt") && args.length > 0 && args[0].equalsIgnoreCase("teaminfo"))) {
-            if (!(sender instanceof Player)) {
+        // 1. コマンドの判定 (/teaminfo または /spt teaminfo)
+        boolean isShorthand = label.equalsIgnoreCase("teaminfo");
+        boolean isSubCommand = label.equalsIgnoreCase("spt") && args.length > 0 && args[0].equalsIgnoreCase("teaminfo");
+
+        if (isShorthand || isSubCommand) {
+            // 2. プレイヤーチェック (AudioPlayerとの衝突を防ぐためフルパス指定)
+            if (!(sender instanceof org.bukkit.entity.Player)) {
                 sender.sendMessage("§cプレイヤーのみ実行可能です。");
                 return true;
             }
-            sendModernTeamInfo((Player) sender);
+            org.bukkit.entity.Player player = (org.bukkit.entity.Player) sender;
+
+            // 3. 引数からグループ名を抽出する (エイリアスによって位置が変わるのを修正)
+            String groupName = null;
+            if (isShorthand) {
+                // /teaminfo <group> の場合、args[0] がグループ名
+                if (args.length > 0) groupName = args[0];
+            } else {
+                // /spt teaminfo <group> の場合、args[1] がグループ名
+                if (args.length > 1) groupName = args[1];
+            }
+
+            // 4. 2つの引数を渡して実行！
+            sendModernTeamInfo(player, groupName);
             return true;
         }
 
@@ -122,11 +141,22 @@ public class SPPTCommand implements CommandExecutor {
                 sender.sendMessage("§6§l[BATTLE] §fグループ §b" + args[1] + " §fで §e" + args[2] + " vs " + args[3] + " §fが開始されました！");
                 break;
 
-            case "teaminfo":
+
             case "moderninfo":
-                if (!(sender instanceof Player)) return true;
-                sendModernTeamInfo((Player) sender);
-                break;
+            case "teaminfo":
+                // 1. senderがプレイヤーであることを確認
+                if (!(sender instanceof org.bukkit.entity.Player)) {
+                    sender.sendMessage("§cこのコマンドはプレイヤーのみ実行可能です。");
+                    return true;
+                }
+
+                // 変数名を target から targetGroupId に変更して衝突を回避
+                org.bukkit.entity.Player p = (org.bukkit.entity.Player) sender;
+                String targetGroupId = (args.length > 1) ? args[1] : null;
+
+                // 2. 引数（グループ名）を渡して呼び出し
+                sendModernTeamInfo(p, targetGroupId);
+                return true;
 
             case "setjoingui":
                 if (args.length < 6) {
@@ -356,64 +386,89 @@ public class SPPTCommand implements CommandExecutor {
 //        player.sendMessage("§8§m                                     ");
 //    }
 
-    public void sendModernTeamInfo(Player player) {
+    public void sendModernTeamInfo(Player player, String targetGroup) {
         UUID uuid = player.getUniqueId();
-        // 1. 自分が実際に所属している「グループ名」と「チームID」を物理ファイルから特定
-        String group = plugin.getTeamManager().getPlayerGroup(uuid);
-        String teamId = plugin.getTeamManager().getPlayerTeam(uuid);
+        String group = targetGroup;
 
-        if (group == null || teamId == null) {
-            player.sendMessage("§c§l[!] §7所属データが見つかりません。");
+        // 引数がない場合は、現在所属しているグループを探す
+        if (group == null) {
+            group = plugin.getTeamManager().getPlayerGroup(uuid);
+        }
+
+        if (group == null) {
+            player.sendMessage("§c§l[!] §7表示するグループを指定するか、どこかのチームに参加してください。");
+            player.sendMessage("§7例: /spt teaminfo neko");
             return;
         }
 
-        // 各種設定と表示名の取得
-        FileConfiguration gCfg = YamlConfiguration.loadConfiguration(plugin.getTeamManager().getRewardFile(group));
-        String groupDisplay = getGroupDisplayName(group);
-        String teamDisplay = plugin.getTeamManager().getTeamDisplayName(group, teamId);
+        // 指定されたグループでのチームIDを取得
+        String teamId = plugin.getTeamManager().getPlayerTeamInGroup(uuid, group);
 
-        // チーム統計の取得
-        int myTeamPoints = plugin.getTeamManager().getTeamPoints(group, teamId);
-        int teamMemberCount = plugin.getTeamManager().getMemberNames(group, teamId).size();
-        double multiplier = plugin.getTeamManager().getTeamActiveMultiplier(group, teamId);
-
-        // --- 表示メイン部分 ---
-        if (gCfg.getBoolean("battle.active", false)) {
-            // 【VSモード中の表示】
-            String t1 = gCfg.getString("battle.team1");
-            String t2 = gCfg.getString("battle.team2");
-            String enemyId = teamId.equals(t1) ? t2 : t1;
-            int enemyPoints = plugin.getTeamManager().getTeamPoints(group, enemyId);
-            String enemyDisplay = plugin.getTeamManager().getTeamDisplayName(group, enemyId);
-
-            player.sendMessage("§8§m      §r " + groupDisplay + " §b§lVS STATUS §r §8§m      ");
-            player.sendMessage("");
-            player.sendMessage(" §f" + teamDisplay + " §b§l" + myTeamPoints + " pt §7(" + teamMemberCount + "人)");
-            player.sendMessage(" " + buildVSBar(myTeamPoints, enemyPoints));
-            player.sendMessage(" §f" + enemyDisplay + " §e§l" + enemyPoints + " pt");
-        } else {
-            // 【通常モード表示】
-            player.sendMessage("§8§m      §r " + groupDisplay + " §f§lTEAM INFO §r §8§m      ");
-            player.sendMessage("");
-            player.sendMessage(" §7所属チーム: " + teamDisplay);
-            player.sendMessage(" §7チーム人数: §f" + teamMemberCount + " 名");
-            player.sendMessage(" §7チーム総計: §e§l" + myTeamPoints + " pt");
+        if (teamId == null) {
+            player.sendMessage("§c§l[!] §7指定されたグループ §b" + group + " §7には参加していません。");
+            return;
         }
 
-        // --- TOP3 取得ロジック (scoresキー対応) ---
-        player.sendMessage("");
-        player.sendMessage(" §e§l▶ §f§lTEAM TOP CONTRIBUTORS");
+        // 設定ファイル: teams/reward/<グループ名>.yml
+        File rewardFile = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
+        FileConfiguration gCfg = YamlConfiguration.loadConfiguration(rewardFile);
 
+        // メンバーファイル: teams/member/<グループ名>/<チーム名>.yml
         File memberFile = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
         FileConfiguration mCfg = YamlConfiguration.loadConfiguration(memberFile);
-        java.util.Map<String, Integer> scoreMap = new java.util.HashMap<>();
 
+        String groupDisplay = ChatColor.translateAlternateColorCodes('&', gCfg.getString("display_name", group));
+        String teamDisplay = plugin.getTeamManager().getTeamDisplayName(group, teamId);
+
+        // チーム合計点 (scoresセクションを合計)
+        int myTeamTotal = 0;
+        java.util.Map<String, Integer> scoreMap = new java.util.HashMap<>();
         if (mCfg.contains("scores")) {
             for (String key : mCfg.getConfigurationSection("scores").getKeys(false)) {
-                scoreMap.put(key, mCfg.getInt("scores." + key));
+                int val = mCfg.getInt("scores." + key);
+                scoreMap.put(key, val);
+                myTeamTotal += val;
             }
         }
 
+        int memberCount = mCfg.getStringList("members").size();
+
+        // --- メイン表示 ---
+        if (gCfg.getBoolean("battle.active", false)) {
+            // 【VSモード中】
+            String t1 = gCfg.getString("battle.team1");
+            String t2 = gCfg.getString("battle.team2");
+            String enemyId = teamId.equals(t1) ? t2 : t1;
+
+            // 敵チームのスコアを計算
+            int enemyTotal = 0;
+            File enemyFile = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + enemyId + ".yml");
+            if (enemyFile.exists()) {
+                FileConfiguration eCfg = YamlConfiguration.loadConfiguration(enemyFile);
+                if (eCfg.contains("scores")) {
+                    for (String key : eCfg.getConfigurationSection("scores").getKeys(false)) {
+                        enemyTotal += eCfg.getInt("scores." + key);
+                    }
+                }
+            }
+
+            player.sendMessage("§8§m      §r " + groupDisplay + " §b§lVS STATUS §r §8§m      ");
+            player.sendMessage("");
+            player.sendMessage(" §f" + teamDisplay + " §b§l" + myTeamTotal + " pt §7(" + memberCount + "人)");
+            player.sendMessage(" " + buildVSBar(myTeamTotal, enemyTotal));
+            player.sendMessage(" §f" + plugin.getTeamManager().getTeamDisplayName(group, enemyId) + " §e§l" + enemyTotal + " pt");
+        } else {
+            // 【通常モード】
+            player.sendMessage("§8§m      §r " + groupDisplay + " §f§lTEAM INFO §r §8§m      ");
+            player.sendMessage("");
+            player.sendMessage(" §7所属チーム: " + teamDisplay);
+            player.sendMessage(" §7チーム人数: §b" + memberCount + " 名");
+            player.sendMessage(" §7チーム総計: §e§l" + myTeamTotal + " pt");
+        }
+
+        // --- TOP3 CONTRIBUTORS ---
+        player.sendMessage("");
+        player.sendMessage(" §e§l▶ §f§lTEAM TOP CONTRIBUTORS");
         if (scoreMap.isEmpty()) {
             player.sendMessage(" §7(まだデータがありません)");
         } else {
@@ -421,17 +476,16 @@ public class SPPTCommand implements CommandExecutor {
                     .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
                     .limit(3)
                     .forEach(e -> {
-                        org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(UUID.fromString(e.getKey()));
-                        String name = (op.getName() != null) ? op.getName() : "Unknown";
-                        player.sendMessage(" §7- §f" + name + ": §e" + e.getValue() + "pt");
+                        String name = Bukkit.getOfflinePlayer(UUID.fromString(e.getKey())).getName();
+                        player.sendMessage(" §7- §f" + (name != null ? name : "Unknown") + ": §e" + e.getValue() + "pt");
                     });
         }
 
         // --- 個人統計 ---
         player.sendMessage("");
         player.sendMessage(" §e§l▶ §f§lYOUR STATS");
-        player.sendMessage("  §7現在の保持: §f" + mCfg.getInt("scores." + uuid.toString(), 0) + " pt");
-        player.sendMessage("  §7貢献ランク: §6" + plugin.getTeamManager().getMemberRank(group, teamId, uuid) + "位 §8| §7倍率: §d" + multiplier + "x");
+        player.sendMessage("  §7あなたのスコア: §f" + scoreMap.getOrDefault(uuid.toString(), 0) + " pt");
+        player.sendMessage("  §7貢献ランク: §6" + plugin.getTeamManager().getMemberRank(group, teamId, uuid) + "位");
         player.sendMessage("§8§m                                     ");
     }
 
@@ -445,15 +499,29 @@ public class SPPTCommand implements CommandExecutor {
 
     private String buildVSBar(int p1, int p2) {
         int total = p1 + p2;
-        if (total == 0) return "§7[§8----------§f|§8----------§7]";
-        // p1(自分のチーム)が左側、p2(敵チーム)が右側
-        int ratio = (int) (((double) p1 / total) * 20);
-        StringBuilder sb = new StringBuilder("§b"); // 自分のチームの色
-        for (int i = 0; i < 20; i++) {
-            if (i == 10) sb.append("§f|§e"); // 中央のセパレータと敵チームの色
-            sb.append(i < ratio ? "■" : "□");
+        if (total == 0) return "§7[ §8--- DRAW --- §7]";
+
+        double pct = ((double) p1 / total) * 100;
+        int segments = 20;
+        int filled = (int) (pct / (100.0 / segments));
+
+        StringBuilder bar = new StringBuilder("§7[");
+        for (int i = 0; i < segments; i++) {
+            if (i == segments / 2) bar.append("§f┃"); // センターライン
+            if (i < filled) bar.append("§b■"); // 自チーム
+            else bar.append("§e■"); // 敵チーム
         }
-        return "§7[" + sb.toString() + "§7] " + (p1 >= p2 ? "§b§l← ADVANTAGE" : "§e§lDISADVANTAGE →");
+        bar.append("§7]");
+
+        // 状況に応じたメッセージ
+        String status;
+        if (pct > 70) status = "§b§l§nCRUSHING!!";
+        else if (pct > 55) status = "§3§lDOMINATING";
+        else if (pct > 45) status = "§f§lDEAD HEAT";
+        else if (pct > 30) status = "§6§lLOSING...";
+        else status = "§c§l§nCRITICAL!!";
+
+        return bar.toString() + " " + status + " §f(" + (int)pct + "% vs " + (100 - (int)pct) + "%)";
     }
 
     private void showAdminInfo(CommandSender sender, String group, String teamId) {

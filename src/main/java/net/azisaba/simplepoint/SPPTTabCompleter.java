@@ -24,7 +24,7 @@ public class SPPTTabCompleter implements TabCompleter {
 
         // 1. サブコマンドの補完
         if (args.length == 1) {
-            List<String> subs = Arrays.asList("leave", "finishvsmode", "create", "teamcreate", "join", "setpoint", "info", "rewardgui", "multiplier", "vsteam", "moderninfo", "teamjoingui", "setjoingui", "member", "toggle", "setpoint_value", "help");
+            List<String> subs = Arrays.asList("leave", "finishvsmode", "create", "teamcreate", "join", "setpoint", "info", "rewardgui", "multiplier", "vsteam", "teaminfo", "teamjoingui", "setjoingui", "member", "toggle", "setpoint_value", "help");
             return StringUtil.copyPartialMatches(args[0], subs, completions);
         }
 

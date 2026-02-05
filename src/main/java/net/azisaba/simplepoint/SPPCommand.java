@@ -21,7 +21,7 @@ public class SPPCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            sendHelp(sender);
+            sendSppHelp(sender);
             return true;
         }
 
@@ -342,7 +342,7 @@ public class SPPCommand implements CommandExecutor {
                 break;
 
             default:
-                sendHelp(sender);
+                sendSppHelp(sender);
                 break;
         }
         return true;
@@ -386,7 +386,7 @@ public class SPPCommand implements CommandExecutor {
         Bukkit.broadcastMessage("§7§m--------------------------------------");
     }
 
-    private void sendHelp(CommandSender sender) {
+    private void sendSppHelp(CommandSender sender) {
         sender.sendMessage("§8§m-----------------------------------------");
         sender.sendMessage("   §6§lSimplePoint §b§lTeam Manager (SPPT)");
         sender.sendMessage("");

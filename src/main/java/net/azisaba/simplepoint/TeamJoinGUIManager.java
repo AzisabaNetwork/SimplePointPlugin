@@ -31,120 +31,102 @@ public class TeamJoinGUIManager implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        // 所属チェック（全走査）
-        String currentTeam = plugin.getTeamManager().getPlayerTeam(player.getUniqueId());
-        if (currentTeam != null) return;
+        // ログイン1秒後に、auto_showが有効なグループをチェック
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
+            if (!rewardDir.exists()) return;
 
-        File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
-        File[] files = rewardDir.listFiles();
-        if (files == null) return;
+            for (File f : rewardDir.listFiles(f -> f.getName().endsWith(".yml"))) {
+                String groupId = f.getName().replace(".yml", "");
+                FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
 
-        for (File f : files) {
-            FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
-            if (cfg.getBoolean("gui.auto_show", false)) {
-                String group = f.getName().replace(".yml", "");
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) == null) {
-                        openJoinGUI(player, group);
+                // 【修正】「その特定のグループ」に未参加の場合のみGUIを表示
+                if (cfg.getBoolean("gui.auto_show", false)) {
+                    if (plugin.getTeamManager().getPlayerTeamInGroup(player.getUniqueId(), groupId) == null) {
+                        openJoinGUI(player, groupId);
+                        break; // 1つ表示したら終了
                     }
-                }, 20L);
-                break;
+                }
             }
-        }
+        }, 20L);
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         String title = event.getView().getTitle();
-        if (!title.contains("Team Join:")) return;
+        if (!ChatColor.stripColor(title).contains("Team Join:")) return;
 
         event.setCancelled(true);
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR) return;
 
         Player player = (Player) event.getWhoClicked();
+
+        // GUIタイトルからグループIDを特定
         String groupId = null;
         File rewardDir = new File(plugin.getDataFolder(), "teams/reward");
-        File[] files = rewardDir.listFiles();
-        if (files != null) {
-            for (File f : files) {
-                String id = f.getName().replace(".yml", "");
-                String dName = ChatColor.stripColor(getGroupDisplayName(id));
-                if (ChatColor.stripColor(title).contains(dName)) {
-                    groupId = id;
-                    break;
-                }
+        for (File f : rewardDir.listFiles(f -> f.getName().endsWith(".yml"))) {
+            String id = f.getName().replace(".yml", "");
+            if (ChatColor.stripColor(title).contains(ChatColor.stripColor(getGroupDisplayName(id)))) {
+                groupId = id;
+                break;
             }
         }
-
         if (groupId == null) return;
 
-        FileConfiguration cfg = YamlConfiguration.loadConfiguration(plugin.getTeamManager().getRewardFile(groupId));
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(new File(rewardDir, groupId + ".yml"));
         String t1 = cfg.getString("gui.team1");
         String t2 = cfg.getString("gui.team2");
 
-        String selectedTeam = null;
         int slot = event.getRawSlot();
-
-        if (slot == 11) selectedTeam = t1;
-        else if (slot == 15) selectedTeam = t2;
+        if (slot == 11) handleGuiClick(player, groupId, t1);
+        else if (slot == 15) handleGuiClick(player, groupId, t2);
         else if (slot == 13 && clicked.getType() == Material.NETHER_STAR) {
-            selectedTeam = determineRandomTeam(groupId, t1, t2);
-        }
-
-        if (selectedTeam != null) {
-            handleGuiClick(player, groupId, selectedTeam);
+            handleGuiClick(player, groupId, determineRandomTeam(groupId, t1, t2));
         }
     }
 
     public void handleGuiClick(Player player, String group, String teamId) {
-        UUID uuid = player.getUniqueId();
-        if (plugin.getTeamManager().getPlayerTeam(uuid) != null) {
-            player.sendMessage("§c§l[!] §7エラー：既にチームに参加しています。");
+        // 【重要】そのグループに既に所属していないかチェック
+        if (plugin.getTeamManager().getPlayerTeamInGroup(player.getUniqueId(), group) != null) {
+            player.sendMessage("§c§l[!] §7あなたは既にこのグループのチームに参加しています。");
             player.closeInventory();
             return;
         }
 
-        plugin.getTeamManager().addMember(group, teamId, uuid);
+        plugin.getTeamManager().addMember(group, teamId, player.getUniqueId());
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
-        player.sendMessage("§a§l[!] §fチーム §b" + teamId + " §fに参加しました！");
+        player.sendMessage("§a§l[!] §fグループ §b" + group + " §fのチーム §l" + teamId + " §fに参加しました！");
         player.closeInventory();
     }
 
     public void openJoinGUI(Player player, String group) {
-        if (plugin.getTeamManager().getPlayerTeam(player.getUniqueId()) != null) {
-            player.sendMessage("§c既にチームに参加しているため、参加GUIは開けません。");
+        // すでにそのグループに入っているなら開かない
+        if (plugin.getTeamManager().getPlayerTeamInGroup(player.getUniqueId(), group) != null) {
+            player.sendMessage("§c既にこのグループには参加済みです。");
             return;
         }
 
-        FileConfiguration cfg = YamlConfiguration.loadConfiguration(plugin.getTeamManager().getRewardFile(group));
-        String mode = cfg.getString("gui.mode", "choice");
+        File file = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
+        if (!file.exists()) return;
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+
         String t1 = cfg.getString("gui.team1");
         String t2 = cfg.getString("gui.team2");
-        String groupDisplayName = getGroupDisplayName(group);
-
         if (t1 == null || t2 == null) return;
 
-        Inventory inv = Bukkit.createInventory(null, 27, "§0Team Join: " + groupDisplayName);
-        if (mode.equalsIgnoreCase("choice")) {
-            inv.setItem(11, createGuiItem(Material.BLUE_BANNER, "§b§l" + t1 + " §fに参加", "§7クリックして加入"));
-            inv.setItem(15, createGuiItem(Material.RED_BANNER, "§c§l" + t2 + " §fに参加", "§7クリックして加入"));
+        Inventory inv = Bukkit.createInventory(null, 27, "§0Team Join: " + getGroupDisplayName(group));
+        if (cfg.getString("gui.mode", "choice").equalsIgnoreCase("choice")) {
+            inv.setItem(11, createGuiItem(Material.BLUE_BANNER, "§b§l" + t1 + " §fに参加"));
+            inv.setItem(15, createGuiItem(Material.RED_BANNER, "§c§l" + t2 + " §fに参加"));
         } else {
-            inv.setItem(13, createGuiItem(Material.NETHER_STAR, "§f§lランダム参加", "§7均等なチームへ自動で割り振られます"));
+            inv.setItem(13, createGuiItem(Material.NETHER_STAR, "§f§lランダム参加", "§7どちらかのチームへ自動で割り振られます"));
         }
         player.openInventory(inv);
     }
 
-    private String getGroupDisplayName(String group) {
-        File file = plugin.getTeamManager().getRewardFile(group);
-        if (!file.exists()) return group;
-        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
-        String name = cfg.getString("display_name", group);
-        return ChatColor.translateAlternateColorCodes('&', name);
-    }
-
     public void setGuiSettings(String group, String t1, String t2, String mode, boolean autoShow) {
-        File file = plugin.getTeamManager().getRewardFile(group);
+        File file = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
         cfg.set("gui.team1", t1);
         cfg.set("gui.team2", t2);
@@ -153,11 +135,16 @@ public class TeamJoinGUIManager implements Listener {
         try { cfg.save(file); } catch (IOException e) { e.printStackTrace(); }
     }
 
+    private String getGroupDisplayName(String group) {
+        File file = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
+        if (!file.exists()) return group;
+        return ChatColor.translateAlternateColorCodes('&', YamlConfiguration.loadConfiguration(file).getString("display_name", group));
+    }
+
     public String determineRandomTeam(String group, String t1, String t2) {
         int n1 = plugin.getTeamManager().getMemberNames(group, t1).size();
         int n2 = plugin.getTeamManager().getMemberNames(group, t2).size();
-        if (n1 == n2) return Math.random() < 0.5 ? t1 : t2;
-        return (n1 < n2) ? t1 : t2;
+        return (n1 <= n2) ? t1 : t2;
     }
 
     private ItemStack createGuiItem(Material material, String name, String... lore) {

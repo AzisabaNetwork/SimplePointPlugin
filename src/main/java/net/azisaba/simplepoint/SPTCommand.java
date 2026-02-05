@@ -25,10 +25,30 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        // 短縮コマンド /teaminfo への対応
-        if (label.equalsIgnoreCase("teaminfo")) {
-            if (!(sender instanceof Player)) return true;
-            plugin.getSPPTCommand().sendModernTeamInfo((Player) sender);
+        // 1. プレイヤーチェック (AudioPlayer等との衝突回避のためフルパス指定)
+        if (!(sender instanceof org.bukkit.entity.Player)) {
+            sender.sendMessage("§cプレイヤーのみ実行可能です。");
+            return true;
+        }
+        org.bukkit.entity.Player player = (org.bukkit.entity.Player) sender;
+
+        // 2. /teaminfo (短縮) または /spt teaminfo (サブコマンド) の判定
+        boolean isShorthand = label.equalsIgnoreCase("teaminfo");
+        boolean isSubCommand = label.equalsIgnoreCase("spt") && args.length > 0 && args[0].equalsIgnoreCase("teaminfo");
+
+        if (isShorthand || isSubCommand) {
+            String groupName = null;
+
+            if (isShorthand) {
+                // 短縮形: /teaminfo <group> なので args[0] がグループ名
+                if (args.length > 0) groupName = args[0];
+            } else {
+                // サブコマンド: /spt teaminfo <group> なので args[1] がグループ名
+                if (args.length > 1) groupName = args[1];
+            }
+
+            // 引数が2つの新しい sendModernTeamInfo を呼び出す
+            plugin.getSPPTCommand().sendModernTeamInfo(player, groupName);
             return true;
         }
 
@@ -60,8 +80,9 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 showPersonalRanking(p, args[1]);
                 break;
             case "teaminfo":
-                // moderninfo の内容を表示するように統合
-                plugin.getSPPTCommand().sendModernTeamInfo(p);
+                // 引数(args[1])があれば取得し、なければnullとして第2引数に渡す
+                String targetGroupId = (args.length > 1) ? args[1] : null;
+                plugin.getSPPTCommand().sendModernTeamInfo(p, targetGroupId);
                 break;
             case "teamreward":
                 handleTeamReward(p, args);

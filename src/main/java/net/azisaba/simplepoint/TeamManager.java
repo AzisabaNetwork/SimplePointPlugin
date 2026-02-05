@@ -356,6 +356,23 @@ public class TeamManager {
         }
     }
 
+    // 特定のグループ内での所属チームを返す
+    public String getPlayerTeamInGroup(UUID uuid, String groupId) {
+        File groupDir = new File(plugin.getDataFolder(), "teams/member/" + groupId);
+        if (!groupDir.exists()) return null;
+
+        File[] teamFiles = groupDir.listFiles((dir, name) -> name.endsWith(".yml"));
+        if (teamFiles == null) return null;
+
+        for (File tFile : teamFiles) {
+            FileConfiguration cfg = YamlConfiguration.loadConfiguration(tFile);
+            if (cfg.getStringList("members").contains(uuid.toString())) {
+                return tFile.getName().replace(".yml", "");
+            }
+        }
+        return null;
+    }
+
 
     /**
      * チームの現在のポイントを取得する際のガード
@@ -385,25 +402,22 @@ public class TeamManager {
      * チーム内での貢献ランキング順位を取得
      */
     public int getMemberRank(String group, String teamId, UUID uuid) {
-        File file = getMemberFile(group, teamId);
-        if (!file.exists()) return 1;
+        File file = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
+        if (!file.exists()) return 0;
+
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        if (!cfg.contains("scores")) return 0;
 
-        // 全メンバーのスコアをリスト化してソート
-        Map<String, Integer> scores = new HashMap<>();
-        if (cfg.getConfigurationSection("contributions") == null) return 1;
+        // スコアをリスト化してソート
+        List<Integer> scores = new ArrayList<>();
+        int myScore = cfg.getInt("scores." + uuid.toString(), 0);
 
-        for (String key : cfg.getConfigurationSection("contributions").getKeys(false)) {
-            scores.put(key, cfg.getInt("contributions." + key));
+        for (String key : cfg.getConfigurationSection("scores").getKeys(false)) {
+            scores.add(cfg.getInt("scores." + key));
         }
 
-        List<Map.Entry<String, Integer>> list = new ArrayList<>(scores.entrySet());
-        list.sort((a, b) -> b.getValue().compareTo(a.getValue()));
-
-        for (int i = 0; i < list.size(); i++) {
-            if (list.get(i).getKey().equals(uuid.toString())) return i + 1;
-        }
-        return list.size();
+        Collections.sort(scores, Collections.reverseOrder());
+        return scores.indexOf(myScore) + 1; // 順位を返す
     }
 
     /**

@@ -482,7 +482,7 @@ public class SPPTCommand implements CommandExecutor {
         sender.sendMessage("  §f- /sppt multiperで期限付きのポイント獲得倍率を設定できます。");
         sender.sendMessage("");
 
-        sender.sendMessage(" §e§l④. §f§l報酬");
+        sender.sendMessage(" §e④. §f§l報酬");
         sender.sendMessage("  §f- /sppt rewardguiでチーム報酬編集GUIを開けます。");
         sender.sendMessage("  §f- チーム総ポイントで取引を解禁することができます。");
         sender.sendMessage("");

@@ -388,24 +388,31 @@ public class SPPCommand implements CommandExecutor {
 
     private void sendSppHelp(CommandSender sender) {
         sender.sendMessage("§8§m-----------------------------------------");
-        sender.sendMessage("   §6§lSimplePoint §b§lTeam Manager (SPPT)");
+        sender.sendMessage("   §6§lSimplePoint §a§lManager (SPP)");
         sender.sendMessage("");
-        sender.sendMessage(" §e§l▶ §b§lチーム・グループ基本操作");
-        sender.sendMessage("  §f/sppt §bcreategroup §3<Group> §7- グループ作成");
-        sender.sendMessage("  §f/sppt §bcreateteam §3<Group> <Team> <表示名> §7- チーム作成");
-        sender.sendMessage("  §f/sppt §bjoin §3<Group> <Team> <Player> §7- メンバー追加");
+        sender.sendMessage(" §e§l▶ §a§lポイント基本操作");
+        sender.sendMessage("  §f/spp §acreate §3<ID> <表示名> §7- 新規作成");
+        sender.sendMessage("  §f/spp §aadd §3<ID> <プレイヤー> <数> §7- 付与");
+        sender.sendMessage("  §f/spp §aremove §3<ID> <プレイヤー> <数> §7- 剥奪");
+        sender.sendMessage("  §f/spp §aset §3<ID> <プレイヤー> <数> §7- 上書き");
         sender.sendMessage("");
-        sender.sendMessage(" §e§l▶ §a§lポイント連携・倍率設定");
-        sender.sendMessage("  §f/sppt §alink §3<Group> <PointID> §7- ポイントと連携");
-        sender.sendMessage("  §f/sppt §amultiplier §3<Group> <倍率> <分> §7- 期限付き倍率設定");
-        sender.sendMessage("  §f/sppt §atogglesync §3<Group> §7- 同期のON/OFF");
+        sender.sendMessage(" §e§l▶ §c§lデータ確認・報酬設定");
+        sender.sendMessage("  §f/spp §cscore §3<ID> <プレイヤー> §7- 所持状況確認");
+        sender.sendMessage("  §f/spp §crewardgui §3<ID> §7- 報酬スロット編集");
+        sender.sendMessage("  §f/spp §cranking §3<ID> §7- §f§l全体チャット§7へのランキング表示");
+        sender.sendMessage("  §f/spp §cadminranking §3<ID> <表示件数> §7- 任意の順位までのランキング表示");
+        sender.sendMessage("  §f/spp §cuserrank §3<ID> <順位> §7- 指定したランキングのプレイヤー表示");
         sender.sendMessage("");
-        sender.sendMessage(" §e§l▶ §d§l報酬・管理GUI");
-        sender.sendMessage("  §f/sppt §drewardgui §3<Group> §7- 報酬スロット編集");
-        sender.sendMessage("  §f/sppt §dinfo §3<Group> <Team> §7- チーム情報表示");
-        sender.sendMessage("  §f/sppt §dmember §3<Group> <Team> §7- メンバー貢献度一覧");
+        sender.sendMessage(" §e§l▶ §e§lシステム設定");
+        sender.sendMessage("  §f/spp §esetreq §3<ID> <Slot> <pt> §7 - 解放条件設定");
+        sender.sendMessage("  §f/spp §etoggleranking §3<ID> §7 - ランキング有効化切替");
+        sender.sendMessage("  §f/spp §etoggleranking §3<ID> §7 - 報酬受け取り有効化切替");
+        sender.sendMessage("  §f/spp §etogglefunction §3<ID> §7 - 報酬受け取り、ランキング有効化切替");
+        sender.sendMessage("  §f/spp §ecreateteam §3<チーム名> §7 - チームデータ作成");
+
+        sender.sendMessage("  §f/spp §freload §7- コンフィグリロード");
         sender.sendMessage("");
-        sender.sendMessage(" §7※ §3<Group>§7は内部ID、表示名はRGB(&#)対応");
+        sender.sendMessage(" §7※ §3<ID>§7は内部用英数字、§3<表示名>§7は日本語/色可");
         sender.sendMessage("§8§m-----------------------------------------");
     }
 }

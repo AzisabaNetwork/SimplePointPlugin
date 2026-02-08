@@ -87,22 +87,35 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                 handleTeamReward(p, args);
                 break;
             case "myinfo": {
-                if (!(sender instanceof Player)) return true;
-                Player senderPlayer = (Player) sender;
-
-                String group = plugin.getTeamManager().getPlayerGroup(senderPlayer.getUniqueId());
-                if (group == null) {
-                    senderPlayer.sendMessage("§cあなたは現在どのチームにも参加していません。");
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage("§cこのコマンドはプレイヤーのみ実行可能です。");
                     return true;
                 }
+                //Player p = (Player) sender;
+                UUID uuid = p.getUniqueId();
 
-                String teamId = plugin.getTeamManager().getPlayerTeamInGroup(senderPlayer.getUniqueId(), group);
-                String teamName = plugin.getTeamManager().getTeamDisplayName(group, teamId);
+                p.sendMessage("§8§m----------§r §b§lMY STATUS §8§m----------");
+                p.sendMessage(" §7所属グループ        §7チーム");
 
-                senderPlayer.sendMessage("§8§m----------§r §b§lMY STATUS §8§m----------");
-                senderPlayer.sendMessage(" §7グループ: §f" + group);
-                senderPlayer.sendMessage(" §7参加チーム: §a" + teamName + " §7(" + teamId + ")");
-                senderPlayer.sendMessage("§8§m----------------------------");
+                // 全グループを走査して所属を確認
+                File teamDir = new File(plugin.getDataFolder(), "teams/team");
+                boolean found = false;
+                if (teamDir.exists() && teamDir.list() != null) {
+                    for (String groupId : teamDir.list()) {
+                        String teamId = plugin.getTeamManager().getPlayerTeamInGroup(uuid, groupId);
+                        if (teamId != null) {
+                            // 左側のグループ名を15文字分で固定（等幅フォントではないので大まかな調整）
+                            String line = String.format(" §f%-20s §a%s", groupId, teamId);
+                            p.sendMessage(line);
+                            found = true;
+                        }
+                    }
+                }
+
+                if (!found) {
+                    p.sendMessage(" §7(現在、どのチームにも所属していません)");
+                }
+                p.sendMessage("§8§m----------------------------");
                 return true;
             }
             case "toggleteamstats":
@@ -187,13 +200,15 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(Player p) {
         p.sendMessage("§8§m----------§r §6§lSPT HELP §8§m----------");
+        p.sendMessage("§b§l[PLAYER]");
         p.sendMessage("§e/spt myp <ID> §7- 個人のポイント確認");
         p.sendMessage("§e/spt reward <ID> §7- 報酬ショップ");
         p.sendMessage("§e/spt ranking <ID> §7- ランキング表示");
         p.sendMessage("");
-        p.sendMessage("§6§l[TEAM]");
+        p.sendMessage("§c§l[TEAM]");
         p.sendMessage("§e/teaminfo <Group> §7- 現在の対戦状況・チーム詳細");
         p.sendMessage("§e/spt teamreward <Group> §7- チーム報酬");
+        p.sendMessage("§e/spt myinfo §7- 自分の情報確認");
         //p.sendMessage("§e/spt toggleteamstats §7- 貢献度の公開/非公開切替");
         p.sendMessage("§8§m----------------------------");
     }

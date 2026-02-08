@@ -1,6 +1,5 @@
-package net.azisaba.simplepoint.managers;
+package net.azisaba.simplepoint;
 
-import net.azisaba.simplepoint.SimplePointPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
@@ -211,21 +210,18 @@ public class TeamManager {
         return !current;
     }
 
-    public void setGroupMultiplier(String group, double multiplier, String startStr, String endStr) {
-        File file = getRewardFile(group);
+    public void setGroupMultiplier(String group, double value, String start, String end) {
+        File file = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
 
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd-HH:mm");
-        try {
-            long startMillis = sdf.parse(startStr).getTime();
-            long endMillis = sdf.parse(endStr).getTime();
+        cfg.set("multiplier.value", value);
+        cfg.set("multiplier.start", start);
+        cfg.set("multiplier.end", end);
 
-            cfg.set("multiplier", multiplier);
-            cfg.set("multiplier_start", startMillis);
-            cfg.set("multiplier_end", endMillis);
+        try {
             cfg.save(file);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("日付形式が正しくありません (yyyy/MM/dd-HH:mm)");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
     public double getActiveMultiplier(String group) {
@@ -444,9 +440,12 @@ public class TeamManager {
     }
 
     public double getTeamActiveMultiplier(String group, String teamId) {
-        File file = getTeamFile(group, teamId);
+        // 読み込み先をチーム個別の yml に変更
+        File file = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
         if (!file.exists()) return 1.0;
+
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        if (!cfg.contains("multiplier")) return 1.0;
 
         double mult = cfg.getDouble("multiplier.value", 1.0);
         String startStr = cfg.getString("multiplier.start");
@@ -460,7 +459,7 @@ public class TeamManager {
             LocalDateTime start = LocalDateTime.parse(startStr, formatter);
             LocalDateTime end = LocalDateTime.parse(endStr, formatter);
 
-            if (now.isAfter(start) && now.isBefore(end)) {
+            if (!now.isBefore(start) && !now.isAfter(end)) {
                 return mult;
             }
         } catch (Exception e) {
@@ -491,14 +490,21 @@ public class TeamManager {
     /**
      * チームごとの倍率設定メソッド (倍率をチームごとに変更するため)
      */
-    public void setTeamMultiplier(String group, String teamId, double multiplier, String start, String end) {
-        File file = getTeamFile(group, teamId);
+    public void setTeamMultiplier(String group, String teamId, double value, String start, String end) {
+        // 保存先をチーム個別の yml に変更
+        File file = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
         if (!file.exists()) return;
+
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
-        cfg.set("multiplier.value", multiplier);
+        cfg.set("multiplier.value", value);
         cfg.set("multiplier.start", start);
         cfg.set("multiplier.end", end);
-        try { cfg.save(file); } catch (Exception e) { e.printStackTrace(); }
+
+        try {
+            cfg.save(file);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**

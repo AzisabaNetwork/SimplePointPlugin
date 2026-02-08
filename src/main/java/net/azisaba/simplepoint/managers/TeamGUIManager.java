@@ -1,6 +1,7 @@
 package net.azisaba.simplepoint.managers;
 
 import net.azisaba.simplepoint.SimplePointPlugin;
+import net.azisaba.simplepoint.TeamManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;

@@ -81,7 +81,7 @@ public class SPPTCommand implements CommandExecutor {
                 sender.sendMessage("§aチーム §l" + args[3] + " §aを作成しました。");
                 break;
 
-            case "join":
+            case "join": {
                 if (args.length < 4) {
                     sender.sendMessage("§c使用法: /sppt join <グループ名> <チームID> <プレイヤー名>");
                     return true;
@@ -94,6 +94,7 @@ public class SPPTCommand implements CommandExecutor {
                 plugin.getTeamManager().addMember(args[1], args[2], target.getUniqueId());
                 sender.sendMessage("§a" + target.getName() + " を §l" + args[2] + " §aに追加しました。");
                 break;
+            }
 
             case "setpoint":
                 if (args.length < 3) {
@@ -113,21 +114,27 @@ public class SPPTCommand implements CommandExecutor {
                 sender.sendMessage("§aグループ §l" + args[1] + " §aのポイント同期を §l" + (newState ? "§bON" : "§cOFF") + " §aにしました。");
                 break;
 
-            case "multiplier":
-                if (args.length < 5) {
-                    sender.sendMessage("§c使用法: /sppt multiplier <group> <倍率> <開始(yyyy/MM/dd-HH:mm)> <終了>");
+            case "multiplier": {
+                if (args.length < 6) { // 引数が1つ増えて 6 になります
+                    sender.sendMessage("§c使用法: /sppt multiplier <group> <teamId> <倍率> <開始> <終了>");
                     return true;
                 }
                 try {
-                    double mult = Double.parseDouble(args[2]);
-                    plugin.getTeamManager().setGroupMultiplier(args[1], mult, args[3], args[4]);
-                    sender.sendMessage("§a倍率を設定しました。");
+                    String group = args[1];
+                    String teamId = args[2];
+                    double mult = Double.parseDouble(args[3]);
+                    String start = args[4];
+                    String end = args[5];
+
+                    plugin.getTeamManager().setTeamMultiplier(group, teamId, mult, start, end);
+                    sender.sendMessage("§aチーム " + teamId + " (" + group + ") に " + mult + "倍 を設定しました。");
                 } catch (Exception e) {
                     sender.sendMessage("§cエラー: " + e.getMessage());
                 }
-                break;
+                return true;
+            }
 
-            case "vsteam":
+            case "vsteam": {
                 if (args.length < 4) {
                     sender.sendMessage("§c使用法: /sppt vsteam <グループ名> <チームID1> <チームID2>");
                     return true;
@@ -140,6 +147,7 @@ public class SPPTCommand implements CommandExecutor {
                 plugin.getTeamManager().startBattle(args[1], args[2], args[3]);
                 sender.sendMessage("§6§l[BATTLE] §fグループ §b" + args[1] + " §fで §e" + args[2] + " vs " + args[3] + " §fが開始されました！");
                 break;
+            }
 
 
             case "moderninfo":
@@ -246,21 +254,59 @@ public class SPPTCommand implements CommandExecutor {
                     sender.sendMessage("§c使用法: /sppt userinfo <プレイヤー名>");
                     return true;
                 }
-                // 'target' ではなく 'targetUser' にして衝突回避
-                org.bukkit.OfflinePlayer targetUser = Bukkit.getOfflinePlayer(args[1]);
+                @SuppressWarnings("deprecation")
+                org.bukkit.OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+                UUID uuid = target.getUniqueId();
 
-                String group = plugin.getTeamManager().getPlayerGroup(targetUser.getUniqueId());
-                sender.sendMessage("§8§m----------§r §6§lUSER INFO: §e" + targetUser.getName() + " §8§m----------");
-                if (group == null) {
-                    sender.sendMessage(" §7状態: §c未所属");
-                } else {
-                    String teamId = plugin.getTeamManager().getPlayerTeamInGroup(targetUser.getUniqueId(), group);
-                    String teamName = plugin.getTeamManager().getTeamDisplayName(group, teamId);
-                    sender.sendMessage(" §7グループ: §f" + group);
-                    sender.sendMessage(" §7チーム: §a" + teamName + " §7(" + teamId + ")");
+                sender.sendMessage("§8§m----------§r §6§lUSER INFO: §e" + target.getName() + " §8§m----------");
+                sender.sendMessage(" §7所属グループ        §7チーム");
+
+                File teamDir = new File(plugin.getDataFolder(), "teams/team");
+                boolean found = false;
+                if (teamDir.exists() && teamDir.list() != null) {
+                    for (String groupId : teamDir.list()) {
+                        String teamId = plugin.getTeamManager().getPlayerTeamInGroup(uuid, groupId);
+                        if (teamId != null) {
+                            String line = String.format(" §f%-20s §a%s", groupId, teamId);
+                            sender.sendMessage(line);
+                            found = true;
+                        }
+                    }
+                }
+
+                if (!found) {
+                    sender.sendMessage(" §7所属状態: §c未所属");
                 }
                 sender.sendMessage("§8§m--------------------------------------");
                 return true;
+            }
+
+            case "deletegroup": {
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /sppt deletegroup <グループID>");
+                    return true;
+                }
+                String gid = args[1];
+                String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmm").format(new java.util.Date());
+
+                // 1. 報酬設定ファイルをリネーム (.yml -> .yml.log)
+                File rewardFile = new File(plugin.getDataFolder(), "teams/reward/" + gid + ".yml");
+                if (rewardFile.exists()) {
+                    File backupReward = new File(plugin.getDataFolder(), "teams/reward/" + gid + ".yml.deleted_" + timestamp + ".log");
+                    rewardFile.renameTo(backupReward);
+                }
+
+                // 2. メンバーフォルダをリネーム (フォルダごと名前を変えて読み込まれなくする)
+                File memberDir = new File(plugin.getDataFolder(), "teams/member/" + gid);
+                if (memberDir.exists()) {
+                    File backupDir = new File(plugin.getDataFolder(), "teams/member/" + gid + "_deleted_" + timestamp);
+                    memberDir.renameTo(backupDir);
+                }
+
+                sender.sendMessage("§e§l[INFO] §fグループ 「" + gid + "」 は無効化され、ログファイルに変換されました。");
+                sender.sendMessage("§8(復元が必要な場合はファイル名を戻してください)");
+                return true;
+
             }
 
             case "finishvsmode":
@@ -283,7 +329,7 @@ public class SPPTCommand implements CommandExecutor {
                 sendManual(sender);
                 return true;
 
-            case "rewardgui":
+            case "rewardgui": {
                 if (args.length < 2) {
                     sender.sendMessage("§c使用法: /sppt rewardgui <グループ名>");
                     return true;
@@ -291,10 +337,12 @@ public class SPPTCommand implements CommandExecutor {
                 if (!(sender instanceof Player)) return true;
                 plugin.getTeamAdminGUIManager().openGroupRewardEditor((Player) sender, args[1]);
                 break;
+            }
 
-            default:
-                sender.sendMessage("§c不明なコマンドです。 /sppt help を参照してください。");
-                break;
+                default:
+                    sender.sendMessage("§c不明なコマンドです。 /sppt help を参照してください。");
+                    break;
+
         }
         return true;
     }
@@ -555,6 +603,7 @@ public class SPPTCommand implements CommandExecutor {
         sender.sendMessage("  §f/sppt §bcreate §3<ID> <Name> §7- グループ作成");
         sender.sendMessage("  §f/sppt §bteamcreate §3<G> <ID> <Name> §7- チーム作成");
         sender.sendMessage("  §f/sppt §bjoin §3<G> <ID> <Player> §7- メンバー追加");
+        sender.sendMessage("  §f/sppt §bjoin §3<G> <ID> <Player> §7- メンバー脱退");
         sender.sendMessage("");
         sender.sendMessage(" §e§l▶ §a§l対戦・ポイント倍率設定");
         sender.sendMessage("  §f/sppt §avsteam §3<G> <T1> <T2> §7- VSモード(対戦)開始");
@@ -563,7 +612,7 @@ public class SPPTCommand implements CommandExecutor {
         sender.sendMessage("  §f/sppt §asetpoint §3<G> <PointID> §7- sppポイント連携");
         sender.sendMessage("  §f/sppt §ateaminfo §3<G> §7- 戦況・貢献度表示");
         sender.sendMessage("  §f/sppt §atoggle §3<G> §7- グループ全体のポイント受け取り設定");
-        sender.sendMessage("  §f/sppt §asetpoint_value §3[G] <T> <Amout> §7- チームのポイントを設定(非推奨)");
+        sender.sendMessage("  §f/sppt §asetpoint_value §3<G> <T> <Amout> §7- チームのポイントを設定(非推奨)");
         sender.sendMessage("");
         sender.sendMessage(" §e§l▶ §d§lGUI・システム管理");
         sender.sendMessage("  §f/sppt §dsetjoingui §3<G> <T1> <T2> <Mode> <Auto> §7- 参加GUI設定");
@@ -571,6 +620,8 @@ public class SPPTCommand implements CommandExecutor {
         sender.sendMessage("  §f/sppt §drewardgui §3<G> §7- 報酬スロット編集");
         sender.sendMessage("  §f/sppt §dmember §3<G> <T> §7- チームメンバー一覧");
         sender.sendMessage("  §f/sppt §dinfo §3<G> <T> §7- 運営用簡易チーム情報");
+        sender.sendMessage("  §f/sppt §duserinfo §3<Player> §7- プレイヤー情報");
+        sender.sendMessage("  §f/sppt §ddeletegroup §3<G> §7- 指定したグループを削除");
         sender.sendMessage("");
         sender.sendMessage(" §7※ §3<G>§7=グループID, §3<T>§7=チームID, §3<Mode>§7=choice/random");
         sender.sendMessage(" §7※ §3<Auto>§7=true/false (ログイン時に表示するか)");

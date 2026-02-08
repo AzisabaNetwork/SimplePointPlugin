@@ -23,10 +23,7 @@ public class RankingShortcutCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player)) {
-            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行可能です。");
-            return true;
-        }
+        if (!(sender instanceof Player)) return true;
         Player player = (Player) sender;
 
         if (args.length < 1) {
@@ -36,26 +33,21 @@ public class RankingShortcutCommand implements CommandExecutor, TabCompleter {
 
         String pointId = args[0];
         FileConfiguration config = plugin.getPointManager().getPointConfig(pointId);
-        String displayName = plugin.getPointManager().getDisplayName(pointId);
 
         if (config == null) {
             player.sendMessage("§cそのポイント名は存在しません。");
             return true;
         }
 
-        // [Check] 全機能停止 (togglefunction)
-        if (!config.getBoolean("_settings.function_enabled", true)) {
-            player.sendMessage("§c現在、" + displayName + " §cの全機能は停止されています。");
-            return true;
-        }
+        String displayName = plugin.getPointManager().getDisplayName(pointId);
 
-        // [Check] ランキング機能停止 (toggleranking)
+        // 機能有効化チェック
         if (!config.getBoolean("_settings.ranking_enabled", true)) {
             player.sendMessage("§c" + displayName + " §cのランキングは現在非公開です。");
             return true;
         }
 
-        // --- ランキング集計ロジック ---
+        // --- ランキング集計 ---
         Map<UUID, Integer> allScores = new HashMap<>();
         for (String key : config.getKeys(false)) {
             if (key.startsWith("_")) continue;
@@ -66,7 +58,12 @@ public class RankingShortcutCommand implements CommandExecutor, TabCompleter {
             } catch (IllegalArgumentException ignored) {}
         }
 
-        // ソート (降順)
+        if (allScores.isEmpty()) {
+            player.sendMessage("§cランキングデータが存在しません。");
+            return true;
+        }
+
+        // ソート
         List<Map.Entry<UUID, Integer>> sortedList = new ArrayList<>(allScores.entrySet());
         sortedList.sort((a, b) -> b.getValue().compareTo(a.getValue()));
 
@@ -83,15 +80,12 @@ public class RankingShortcutCommand implements CommandExecutor, TabCompleter {
 
         // 表示
         player.sendMessage("§8§m----------§r " + displayName + " §6§lRANKING §8§m----------");
-
         for (int i = 0; i < Math.min(sortedList.size(), 7); i++) {
             UUID uuid = sortedList.get(i).getKey();
             OfflinePlayer op = Bukkit.getOfflinePlayer(uuid);
-            String name = op.getName();
             int score = sortedList.get(i).getValue();
-
             String color = (i == 0) ? "§e" : (i == 1) ? "§f" : (i == 2) ? "§6" : "§7";
-            player.sendMessage(color + (i + 1) + ". §r" + (name != null ? name : "Unknown") + " §7: §b" + score + " pt");
+            player.sendMessage(color + (i + 1) + ". §r" + (op.getName() != null ? op.getName() : "Unknown") + " §7: §b" + score + " pt");
         }
 
         player.sendMessage("§8§m--------------------------------------");
@@ -101,8 +95,8 @@ public class RankingShortcutCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§fあなたの順位: §7圏外");
         }
         player.sendMessage("§8§m--------------------------------------");
-        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 1.0f);
 
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 1.0f);
         return true;
     }
 

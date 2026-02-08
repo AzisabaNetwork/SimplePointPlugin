@@ -19,5 +19,5 @@ commands:
     description: Check the ranking quickly
     usage: /ranking <id>
   teaminfo:
-    description: Check your points quickly
+    description: Check your team info quickly
     usage: /teaminfo <group> <team>

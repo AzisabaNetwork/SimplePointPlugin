@@ -3,6 +3,7 @@ package net.azisaba.simplepoint.commands;
 import net.azisaba.simplepoint.SimplePointPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -239,6 +240,28 @@ public class SPPTCommand implements CommandExecutor {
                 plugin.getTeamManager().removeMember(args[1], args[2], offTarget.getUniqueId());
                 sender.sendMessage("§a" + inputName + " を脱退させました。");
                 break;
+
+            case "userinfo": {
+                if (args.length < 2) {
+                    sender.sendMessage("§c使用法: /sppt userinfo <プレイヤー名>");
+                    return true;
+                }
+                // 'target' ではなく 'targetUser' にして衝突回避
+                org.bukkit.OfflinePlayer targetUser = Bukkit.getOfflinePlayer(args[1]);
+
+                String group = plugin.getTeamManager().getPlayerGroup(targetUser.getUniqueId());
+                sender.sendMessage("§8§m----------§r §6§lUSER INFO: §e" + targetUser.getName() + " §8§m----------");
+                if (group == null) {
+                    sender.sendMessage(" §7状態: §c未所属");
+                } else {
+                    String teamId = plugin.getTeamManager().getPlayerTeamInGroup(targetUser.getUniqueId(), group);
+                    String teamName = plugin.getTeamManager().getTeamDisplayName(group, teamId);
+                    sender.sendMessage(" §7グループ: §f" + group);
+                    sender.sendMessage(" §7チーム: §a" + teamName + " §7(" + teamId + ")");
+                }
+                sender.sendMessage("§8§m--------------------------------------");
+                return true;
+            }
 
             case "finishvsmode":
                 if (args.length < 2) {

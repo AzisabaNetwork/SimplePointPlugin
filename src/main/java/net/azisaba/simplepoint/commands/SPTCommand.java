@@ -86,6 +86,25 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
             case "teamreward":
                 handleTeamReward(p, args);
                 break;
+            case "myinfo": {
+                if (!(sender instanceof Player)) return true;
+                Player senderPlayer = (Player) sender;
+
+                String group = plugin.getTeamManager().getPlayerGroup(senderPlayer.getUniqueId());
+                if (group == null) {
+                    senderPlayer.sendMessage("§cあなたは現在どのチームにも参加していません。");
+                    return true;
+                }
+
+                String teamId = plugin.getTeamManager().getPlayerTeamInGroup(senderPlayer.getUniqueId(), group);
+                String teamName = plugin.getTeamManager().getTeamDisplayName(group, teamId);
+
+                senderPlayer.sendMessage("§8§m----------§r §b§lMY STATUS §8§m----------");
+                senderPlayer.sendMessage(" §7グループ: §f" + group);
+                senderPlayer.sendMessage(" §7参加チーム: §a" + teamName + " §7(" + teamId + ")");
+                senderPlayer.sendMessage("§8§m----------------------------");
+                return true;
+            }
             case "toggleteamstats":
                 plugin.getTeamManager().toggleStats(p.getUniqueId());
                 boolean now = plugin.getTeamManager().canShowStats(p.getUniqueId());

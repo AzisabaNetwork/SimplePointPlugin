@@ -49,6 +49,21 @@ public class SimplePointPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(teamGUIManager, this);
         getServer().getPluginManager().registerEvents(teamJoinGUIManager, this);
 
+        // 1. /ranking コマンドの登録
+        RankingShortcutCommand rankingCmd = new RankingShortcutCommand(this);
+        getCommand("ranking").setExecutor(rankingCmd);
+        getCommand("ranking").setTabCompleter(rankingCmd);
+
+        // 2. /teaminfo コマンドの登録
+        TeamInfoCommand teamInfoCmd = new TeamInfoCommand(this);
+        getCommand("teaminfo").setExecutor(teamInfoCmd);
+        getCommand("teaminfo").setTabCompleter(teamInfoCmd);
+
+        // 3. /myp コマンドの登録
+        MYPCommand mypCmd = new MYPCommand(this);
+        getCommand("myp").setExecutor(mypCmd);
+        getCommand("myp").setTabCompleter(mypCmd);
+
 
         // ★ 追加: 個人ポイント獲得をチームに同期させるリスナー
         getServer().getPluginManager().registerEvents(new PointSyncListener(this), this);

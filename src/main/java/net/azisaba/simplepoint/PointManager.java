@@ -1,11 +1,10 @@
-package net.azisaba.simplepoint.managers;
+package net.azisaba.simplepoint;
 
-import net.azisaba.simplepoint.PointAddEvent; // パッケージ名に合わせて適宜修正してください
-import net.azisaba.simplepoint.SimplePointPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 
 import java.io.File;
 import java.io.IOException;
@@ -169,24 +168,38 @@ public class PointManager {
         FileConfiguration cfg = getPointConfig(id);
         if (cfg == null) return;
 
+        // --- 倍率の取得 ---
+        String groupId = plugin.getTeamManager().getPlayerGroup(uuid);
+        String teamId = (groupId != null) ? plugin.getTeamManager().getPlayerTeamInGroup(uuid, groupId) : null;
+        double multiplier = (groupId != null && teamId != null) ?
+                plugin.getTeamManager().getTeamActiveMultiplier(groupId, teamId) : 1.0;
+
+        int finalAmount = (int) (amount * multiplier);
+
+        // --- 1. 個人ポイントの保存 (current: 使うと減る / total: 実績) ---
         int current = cfg.getInt(uuid.toString() + ".current", 0);
         int total = cfg.getInt(uuid.toString() + ".total", 0);
 
-        cfg.set(uuid.toString() + ".current", current + amount);
-        if (amount > 0) {
-            cfg.set(uuid.toString() + ".total", total + amount);
+        cfg.set(uuid.toString() + ".current", current + finalAmount);
+        if (finalAmount > 0) {
+            cfg.set(uuid.toString() + ".total", total + finalAmount);
         }
         savePointConfig(id);
 
-        // --- 重要: 2倍加算の修正 ---
-        // ここで plugin.getTeamManager().syncPoint() を呼ぶと、
-        // 下記の Event を経由して Listener 側でも syncPoint が呼ばれるため、2回加算されてしまいます。
-        // リスナー(PointSyncListener)を用意している場合は、ここでの syncPoint 呼び出しは不要です。
-
-        // --- カスタムイベントの呼び出し ---
-        // Listener 側で TeamManager.syncPoint(uuid, id, amount) が実行されるようにします。
-        PointAddEvent event = new PointAddEvent(uuid, id, amount);
+        // --- 2. チーム累計ポイントの更新 (syncPoint内で処理) ---
+        // ここで syncPoint が呼ばれることで、チームファイル側の「減らない合計」も更新されます
+        PointAddEvent event = new PointAddEvent(uuid, id, finalAmount);
         Bukkit.getPluginManager().callEvent(event);
+
+        // --- 3. メッセージ表示 (装飾名を使用) ---
+        Player p = Bukkit.getPlayer(uuid);
+        if (p != null && groupId != null && teamId != null) {
+            // 装飾付きの表示名を取得
+            String groupDisplay = plugin.getTeamManager().getGroupDisplayName(groupId);
+            String teamDisplay = plugin.getTeamManager().getTeamDisplayName(groupId, teamId);
+
+            p.sendMessage("§a§l[+] §f" + teamDisplay + "§7(§f" + groupDisplay + "§7) に §e" + finalAmount + "pt §f貢献しました！");
+        }
     }
 
     public void setPoint(String id, UUID uuid, int amount) {

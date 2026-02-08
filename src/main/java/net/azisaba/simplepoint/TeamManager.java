@@ -162,11 +162,18 @@ public class TeamManager {
     public int getContribution(String group, String teamId, UUID uuid) { return YamlConfiguration.loadConfiguration(getMemberFile(group, teamId)).getInt("scores." + uuid.toString(), 0); }
 
     public String getTeamDisplayName(String group, String teamId) {
-        File file = new File(plugin.getDataFolder(), "teams/team/" + group + "/" + teamId + ".yml");
-        if (!file.exists()) return teamId;
-        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
-        String name = cfg.getString("display_name", teamId);
-        return ChatColor.translateAlternateColorCodes('&', name);
+        File teamFile = new File(plugin.getDataFolder(), "teams/team/" + group + "/" + teamId + ".yml");
+        if (!teamFile.exists()) return teamId;
+        FileConfiguration tCfg = YamlConfiguration.loadConfiguration(teamFile);
+        return ChatColor.translateAlternateColorCodes('&', tCfg.getString("display_name", teamId));
+    }
+
+    public String getGroupDisplayName(String group) {
+        File rewardFile = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
+        if (!rewardFile.exists()) return group;
+        FileConfiguration gCfg = YamlConfiguration.loadConfiguration(rewardFile);
+        // & を § に変換して返す。設定がない場合はIDを返す
+        return ChatColor.translateAlternateColorCodes('&', gCfg.getString("display_name", group));
     }
 
     public double getTeamTotalPoints(String group, String teamId) {

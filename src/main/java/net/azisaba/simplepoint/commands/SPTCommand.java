@@ -104,8 +104,10 @@ public class SPTCommand implements CommandExecutor, TabCompleter {
                     for (String groupId : teamDir.list()) {
                         String teamId = plugin.getTeamManager().getPlayerTeamInGroup(uuid, groupId);
                         if (teamId != null) {
+                            String groupDisplay = plugin.getTeamManager().getGroupDisplayName(groupId);
+                            String teamDisplay = plugin.getTeamManager().getTeamDisplayName(groupId, teamId);
                             // 左側のグループ名を15文字分で固定（等幅フォントではないので大まかな調整）
-                            String line = String.format(" §f%-20s §a%s", groupId, teamId);
+                            String line = String.format(" §f%-20s §a%s", groupDisplay, teamDisplay);
                             p.sendMessage(line);
                             found = true;
                         }

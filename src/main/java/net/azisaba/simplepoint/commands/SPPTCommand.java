@@ -254,7 +254,6 @@ public class SPPTCommand implements CommandExecutor {
                     sender.sendMessage("§c使用法: /sppt userinfo <プレイヤー名>");
                     return true;
                 }
-                @SuppressWarnings("deprecation")
                 org.bukkit.OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
                 UUID uuid = target.getUniqueId();
 
@@ -267,16 +266,18 @@ public class SPPTCommand implements CommandExecutor {
                     for (String groupId : teamDir.list()) {
                         String teamId = plugin.getTeamManager().getPlayerTeamInGroup(uuid, groupId);
                         if (teamId != null) {
-                            String line = String.format(" §f%-20s §a%s", groupId, teamId);
-                            sender.sendMessage(line);
+                            // ここで共通メソッドを呼び出す！
+                            String groupDisplay = plugin.getTeamManager().getGroupDisplayName(groupId);
+                            String teamDisplay = plugin.getTeamManager().getTeamDisplayName(groupId, teamId);
+
+                            // 表示（フォーマットを整える）
+                            sender.sendMessage(" §f" + groupDisplay + " §8| §a" + teamDisplay);
                             found = true;
                         }
                     }
                 }
 
-                if (!found) {
-                    sender.sendMessage(" §7所属状態: §c未所属");
-                }
+                if (!found) sender.sendMessage(" §7所属状態: §c未所属");
                 sender.sendMessage("§8§m--------------------------------------");
                 return true;
             }
@@ -384,6 +385,7 @@ public class SPPTCommand implements CommandExecutor {
         UUID uuid = player.getUniqueId();
         String group = targetGroup;
 
+
         if (group == null) {
             group = plugin.getTeamManager().getPlayerGroup(uuid);
         }
@@ -409,7 +411,7 @@ public class SPPTCommand implements CommandExecutor {
         double multiplier = plugin.getTeamManager().getTeamActiveMultiplier(group, teamId);
 
         // スコア計算
-        int myTeamTotal = 0;
+        int myTeamTotal = mCfg.getInt("total_score", 0);
         java.util.TreeMap<String, Integer> scoreMap = new java.util.TreeMap<>();
         if (mCfg.contains("scores")) {
             for (String key : mCfg.getConfigurationSection("scores").getKeys(false)) {
@@ -440,6 +442,8 @@ public class SPPTCommand implements CommandExecutor {
             }
 
             player.sendMessage("§8§m      §r " + groupDisplay + " §b§lVS STATUS §r §8§m      ");
+            player.sendMessage("");
+            player.sendMessage(" §e所属チーム:" + teamDisplay + " §7合計§b§l" + myTeamTotal + "§7pt");
             player.sendMessage("");
             player.sendMessage(" §f" + teamDisplay + " §b§l" + myTeamTotal + " pt §7(" + memberCount + "人) " );
             player.sendMessage(" " + buildVSBar(myTeamTotal, enemyTotal));

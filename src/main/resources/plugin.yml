@@ -16,6 +16,9 @@ commands:
   myp:
     description: Check your points quickly
     usage: /myp <id>
+  pino:
+    description: Check your points quickly
+    usage: Hi!Lets play pray!
   ranking:
     description: Check the ranking quickly
     usage: /ranking <id>

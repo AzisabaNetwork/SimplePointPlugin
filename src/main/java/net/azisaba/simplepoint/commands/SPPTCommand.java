@@ -426,42 +426,52 @@ public class SPPTCommand implements CommandExecutor {
         UUID uuid = player.getUniqueId();
         String group = targetGroup;
 
-
+        // --- 修正ポイント1: グループ指定がない場合の自動取得 ---
         if (group == null) {
-            group = plugin.getTeamManager().getPlayerGroup(uuid);
+            List<String> joinedGroups = plugin.getTeamManager().getAllJoinedGroups(uuid);
+            if (joinedGroups.isEmpty()) {
+                player.sendMessage("§c§l[!] §7あなたは現在、どのグループのチームにも所属していません。");
+                return;
+            }
+            // 複数学所属している場合は、リストの最初（またはアクティブなもの）を表示
+            group = joinedGroups.get(0);
         }
 
-        if (group == null) {
-            player.sendMessage("§c§l[!] §7表示するグループを指定するか、どこかのチームに参加してください。");
-            return;
-        }
-
+        // --- 修正ポイント2: 所属判定 ---
         String teamId = plugin.getTeamManager().getPlayerTeamInGroup(uuid, group);
         if (teamId == null) {
-            player.sendMessage("§c§l[!] §7グループ §b" + group + " §7には参加していません。");
+            player.sendMessage("§c§l[!] §7あなたはグループ §b" + group + " §7内のチームには所属していません。");
             return;
         }
 
+        // ファイルパスの構成
         File rewardFile = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
         FileConfiguration gCfg = YamlConfiguration.loadConfiguration(rewardFile);
+
+        // メンバー情報の読み込み
         File memberFile = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
         FileConfiguration mCfg = YamlConfiguration.loadConfiguration(memberFile);
 
-        String groupDisplay = ChatColor.translateAlternateColorCodes('&', gCfg.getString("display_name", group));
+        String groupDisplay = org.bukkit.ChatColor.translateAlternateColorCodes('&', gCfg.getString("display_name", group));
         String teamDisplay = plugin.getTeamManager().getTeamDisplayName(group, teamId);
         double multiplier = plugin.getTeamManager().getTeamActiveMultiplier(group, teamId);
 
-        // スコア計算
-        int myTeamTotal = mCfg.getInt("total_score", 0);
+        // --- 修正ポイント3: スコア計算の正確化 ---
+        // total_score(チーム累計)を取得
+        int myTeamTotal = plugin.getTeamManager().getTeamTotalScore(group, teamId);
+
         java.util.TreeMap<String, Integer> scoreMap = new java.util.TreeMap<>();
         if (mCfg.contains("scores")) {
             for (String key : mCfg.getConfigurationSection("scores").getKeys(false)) {
-                int val = mCfg.getInt("scores." + key);
+                // ここを .total まで指定するように修正！
+                int val = mCfg.getInt("scores." + key + ".total", 0);
                 scoreMap.put(key, val);
-                myTeamTotal += val;
             }
         }
-        int memberCount = mCfg.getStringList("members").size();
+
+        // メンバー人数の取得 (リストがない場合は0)
+        List<String> members = mCfg.getStringList("members");
+        int memberCount = (members != null) ? members.size() : 0;
 
         // --- メイン表示 (VS or NORMAL) ---
         if (gCfg.getBoolean("battle.active", false)) {
@@ -469,20 +479,13 @@ public class SPPTCommand implements CommandExecutor {
             String t2 = gCfg.getString("battle.team2");
             String enemyId = teamId.equals(t1) ? t2 : t1;
 
-            int enemyTotal = 0;
-            int enemyCount = 0;
-            File enemyFile = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + enemyId + ".yml");
-            if (enemyFile.exists()) {
-                FileConfiguration eCfg = YamlConfiguration.loadConfiguration(enemyFile);
-                enemyCount = eCfg.getStringList("members").size();
-                if (eCfg.contains("scores")) {
-                    for (String key : eCfg.getConfigurationSection("scores").getKeys(false)) {
-                        enemyTotal += eCfg.getInt("scores." + key);
-                    }
-                }
-            }
+            int enemyTotal = plugin.getTeamManager().getTeamTotalScore(group, enemyId);
 
-            player.sendMessage("§8§m      §r " + groupDisplay + " §b§lVS STATUS §r §8§m      ");
+            // 敵チームの人数取得
+            File enemyMemberFile = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + enemyId + ".yml");
+            int enemyCount = YamlConfiguration.loadConfiguration(enemyMemberFile).getStringList("members").size();
+
+            player.sendMessage("§8§m      §r " + groupDisplay + " §4§lV§6§lS §c§lSTATUS §r §8§m      ");
             player.sendMessage("");
             player.sendMessage(" §e所属チーム:" + teamDisplay + " §7合計§b§l" + myTeamTotal + "§7pt");
             player.sendMessage("");
@@ -496,22 +499,24 @@ public class SPPTCommand implements CommandExecutor {
             player.sendMessage(" §7チーム総計: §e§l" + myTeamTotal + " pt");
         }
 
-        // --- TOP3 (デザイン微調整) ---
+        // --- TOP3 表示 ---
         player.sendMessage("");
         player.sendMessage(" §e§l▶ §f§lTEAM TOP CONTRIBUTORS");
         if (scoreMap.isEmpty()) {
             player.sendMessage(" §7(データがありません)");
         } else {
             scoreMap.entrySet().stream()
-                    .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
+                    .sorted((a, b) -> b.getValue().compareTo(a.getValue())) // 降順ソート
                     .limit(3)
                     .forEach(e -> {
-                        String name = Bukkit.getOfflinePlayer(UUID.fromString(e.getKey())).getName();
+                        // OfflinePlayerの取得はメインスレッドで動作しますが、人数が多いと一瞬重くなるため
+                        // 本来は名前もキャッシュするのが理想ですが、TOP3程度なら問題ありません。
+                        String name = org.bukkit.Bukkit.getOfflinePlayer(UUID.fromString(e.getKey())).getName();
                         player.sendMessage(" §7- §f" + (name != null ? name : "Unknown") + " §e" + e.getValue() + "§7pt");
                     });
         }
 
-        // --- YOUR STATS (ここを大幅強化) ---
+        // --- YOUR STATS ---
         int myScore = scoreMap.getOrDefault(uuid.toString(), 0);
         int myRank = plugin.getTeamManager().getMemberRank(group, teamId, uuid);
 
@@ -519,15 +524,12 @@ public class SPPTCommand implements CommandExecutor {
         player.sendMessage(" §e§l▶ §f§lYOUR STATS");
         player.sendMessage("  §7個人貢献: §f" + myScore + " pt §8| §7倍率: §d" + multiplier + "x");
 
-        // 次のランク（自分より上の人）への差を表示（面白い要素）
         if (myRank > 1) {
-            int nextScore = scoreMap.values().stream()
-                    .sorted(java.util.Comparator.reverseOrder())
-                    .mapToInt(Integer::intValue)
-                    .toArray()[myRank - 2];
-
+            // 次のランクへの差
+            Object[] sortedScores = scoreMap.values().stream().sorted(java.util.Comparator.reverseOrder()).toArray();
+            int nextScore = (int) sortedScores[myRank - 2];
             player.sendMessage("  §7貢献ランク: §6" + myRank + "位 §8(§7あと §e" + (nextScore - myScore) + "pt §7でランクアップ!§8)");
-        } else {
+        } else if (myRank == 1) {
             player.sendMessage("  §7貢献ランク: §6§l1位");
         }
         player.sendMessage("§8§m                                     ");

@@ -4,6 +4,8 @@ import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.OfflinePlayer;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.UUID;
+
 public class SimplePointExpansion extends PlaceholderExpansion {
     private final SimplePointPlugin plugin;
 
@@ -19,6 +21,7 @@ public class SimplePointExpansion extends PlaceholderExpansion {
     @Override
     public String onRequest(OfflinePlayer player, @NotNull String params) {
         if (player == null) return "";
+        UUID uuid = player.getUniqueId();
 
         // %simplepoint_point_<ポイントID>% (現在の所持ポイント：使うと減る)
         if (params.startsWith("point_")) {
@@ -31,6 +34,13 @@ public class SimplePointExpansion extends PlaceholderExpansion {
         if (params.startsWith("total_point_")) {
             String pointId = params.replace("total_point_", "");
             return String.valueOf(plugin.getPointManager().getTotalPoint(pointId, player.getUniqueId()));
+        }
+
+        if (params.startsWith("total_score_")) {
+            String groupId = params.replace("total_score_", "");
+            String teamId = plugin.getTeamManager().getPlayerTeamInGroup(uuid, groupId);
+            if (teamId == null) return "0";
+            return String.valueOf(plugin.getTeamManager().getTeamTotalScore(groupId, teamId));
         }
 
         // %simplepoint_vs_bar_<グループID>%

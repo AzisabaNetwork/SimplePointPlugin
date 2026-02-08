@@ -139,12 +139,23 @@ public class TeamGUIManager implements Listener {
 
         if (!rewardCfg.contains(String.valueOf(slot))) return;
 
-        // 1. 連携ポイントIDの取得先を rewardCfg (グループ設定) に変更
-        // これにより「連携ポイントが設定されていません」のエラーを解消します
-        String linkedPointId = rewardCfg.getString("linked_point", "none");
+        // 1. 紐付けられたポイントIDを動的に取得
+        String linkedPointId = "none";
+        File pointsFolder = new File(plugin.getDataFolder(), "points");
+        if (pointsFolder.exists() && pointsFolder.listFiles() != null) {
+            for (File f : pointsFolder.listFiles()) {
+                if (!f.getName().endsWith(".yml")) continue;
+                FileConfiguration pCfg = YamlConfiguration.loadConfiguration(f);
+                if (group.equals(pCfg.getString("linked_group"))) {
+                    linkedPointId = f.getName().replace(".yml", "");
+                    break;
+                }
+            }
+        }
 
         if (linkedPointId.equals("none")) {
-            player.sendMessage("§cこのグループには連携ポイントが設定されていません。管理者に /sppt setpoint を実行するよう伝えてください。");
+            player.sendMessage("§cこのグループ(§l" + group + "§c)にはポイントIDが紐付けられていません。");
+            player.sendMessage("§7/sppt setpoint " + group + " <ポイントID> で紐付けてください。");
             return;
         }
 
@@ -154,54 +165,61 @@ public class TeamGUIManager implements Listener {
         int contReq = rewardCfg.getInt(slot + ".contribution_requirement", 0);
         int stock = rewardCfg.getInt(slot + ".team_stock", -1);
 
-        // --- バリデーション ---
+        // --- バリデーション (購入可否チェック) ---
 
-        // チーム累計チェック
-        if (plugin.getTeamManager().getTeamTotalPoint(group, teamId) < teamReq) {
-            player.sendMessage("§cチームの累計獲得スコアが目標(" + teamReq + "pt)に達していないため解放されていません。");
+        // チーム累計チェック (TeamManagerのメソッドを使用)
+        int currentTeamTotal = plugin.getTeamManager().getTeamTotalScore(group, teamId);
+        if (currentTeamTotal < teamReq) {
+            player.sendMessage("§cチーム累計スコアが足りません (§f" + currentTeamTotal + "§7/§e" + teamReq + "pt§c)");
             return;
         }
 
-        // 個人貢献度チェック (累計貢献度で判定)
-        if (plugin.getTeamManager().getContribution(group, teamId, player.getUniqueId()) < contReq) {
-            player.sendMessage("§cあなたの累計貢献度が " + contReq + "pt に達していないため購入できません。");
+        // 個人累計貢献度チェック
+        int currentCont = plugin.getTeamManager().getContribution(group, teamId, player.getUniqueId());
+        if (currentCont < contReq) {
+            player.sendMessage("§cあなたの累計貢献度が足りません (§f" + currentCont + "§7/§e" + contReq + "pt§c)");
             return;
         }
 
         // 在庫チェック
         if (stock == 0) {
-            player.sendMessage("§cこの報酬はチーム内で売り切れました。");
+            player.sendMessage("§cこの報酬は売り切れです。");
             return;
         }
 
-        // 所持ポイントチェック
+        // 所持ポイント(消費用)チェック
         int playerBalance = plugin.getPointManager().getPoint(linkedPointId, player.getUniqueId());
         if (playerBalance < price) {
-            player.sendMessage("§c所持ポイントが足りません！ (所持: " + playerBalance + " / 必要: " + price + ")");
+            player.sendMessage("§c所持ポイントが足りません (§f" + playerBalance + "§7/§e" + price + "pt§c)");
             return;
         }
 
         // --- 購入処理の実行 ---
 
-        // 重要: 総ポイント(total)を減らさず、現在の所持ポイント(current)のみを減らすメソッドを使用
-        // PointManager側に消費専用のロジック（addPoint内でtotalを更新しないフラグ等）があることを前提としています
+        // 1. ポイントを減算 (currentのみ減らす)
         plugin.getPointManager().takePoint(linkedPointId, player.getUniqueId(), price);
 
-        // 在庫の減算
+        // 2. 共有在庫の減算
         if (stock > 0) {
             rewardCfg.set(slot + ".team_stock", stock - 1);
-            try { rewardCfg.save(rewardFile); } catch (IOException e) { e.printStackTrace(); }
+            try {
+                rewardCfg.save(rewardFile);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
-        // アイテム付与
-        ItemStack rewardItem = rewardCfg.getItemStack(slot + ".item").clone();
-        player.getInventory().addItem(rewardItem);
+        // 3. アイテム付与
+        ItemStack rewardItem = rewardCfg.getItemStack(slot + ".item");
+        if (rewardItem != null) {
+            player.getInventory().addItem(rewardItem.clone());
+        }
 
-        // 演出
-        player.sendMessage("§a§l購入完了！ §f" + rewardItem.getItemMeta().getDisplayName() + " §fを受け取りました。");
+        // 4. 演出とログ
+        player.sendMessage("§a§l購入完了! §e" + price + "pt §f消費しました。");
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.2f);
 
-        // GUIをリフレッシュ
+        // 5. GUIをリフレッシュ（最新の在庫・所持ポイントを表示）
         openTeamRewardGUI(player, group);
     }
 }

@@ -2,30 +2,40 @@ package net.azisaba.simplepoint;
 
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
+import org.jetbrains.annotations.NotNull;
 import java.util.UUID;
 
-public class PointAddEvent extends Event { // ★ここが重要
-    private static final HandlerList HANDLERS = new HandlerList();
+public class PointAddEvent extends Event {
+    private static final HandlerList handlers = new HandlerList();
     private final UUID uuid;
-    private final String id;
-    private final int amount;
+    private final String pointId; // ポイントID (例: event_point)
+    private final int amount;     // 加算量
 
-    public PointAddEvent(UUID uuid, String id, int amount) {
+    public PointAddEvent(UUID uuid, String pointId, int amount) {
         this.uuid = uuid;
-        this.id = id;
+        this.pointId = pointId;
         this.amount = amount;
     }
 
-    public UUID getUuid() { return uuid; }
-    public String getId() { return id; }
-    public int getAmount() { return amount; }
+    public UUID getUuid() {
+        return uuid;
+    }
+
+    // ★これが不足していたメソッドです
+    public String getPointId() {
+        return pointId;
+    }
+
+    public int getAmount() {
+        return amount;
+    }
 
     @Override
-    public HandlerList getHandlers() {
-        return HANDLERS;
+    public @NotNull HandlerList getHandlers() {
+        return handlers;
     }
 
     public static HandlerList getHandlerList() {
-        return HANDLERS;
+        return handlers;
     }
 }

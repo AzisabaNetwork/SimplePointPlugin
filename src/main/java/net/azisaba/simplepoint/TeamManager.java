@@ -5,6 +5,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import java.io.File;
 import java.io.IOException;
@@ -66,14 +67,27 @@ public class TeamManager {
 
     // --- メンバー管理 ---
     public void addMember(String group, String teamId, UUID uuid) {
-        File f = getMemberFile(group, teamId);
+        File f = getMemberFile(group, teamId); // teams/member/zettai/hiru.yml
         if (!f.getParentFile().exists()) f.getParentFile().mkdirs();
+
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
         List<String> members = cfg.getStringList("members");
+
         if (!members.contains(uuid.toString())) {
             members.add(uuid.toString());
             cfg.set("members", members);
-            try { cfg.save(f); } catch (IOException e) { e.printStackTrace(); }
+
+            // --- 不足していたポイント: 所属判定用のキー作成 ---
+            // これがないと getPlayerTeamInGroup で cfg.contains("scores." + uuid) が false になります
+            if (!cfg.contains("scores." + uuid.toString())) {
+                cfg.set("scores." + uuid.toString() + ".total", 0);
+            }
+
+            try {
+                cfg.save(f);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -168,6 +182,11 @@ public class TeamManager {
         return ChatColor.translateAlternateColorCodes('&', tCfg.getString("display_name", teamId));
     }
 
+//    public int getTeamTotalScore(String groupId, String teamId) {
+//        File file = new File(plugin.getDataFolder(), "teams/member/" + groupId + "/" + teamId + ".yml");
+//        return YamlConfiguration.loadConfiguration(file).getInt("total_score", 0);
+//    }
+
     // TeamManager.java 内に追加
     public String getVSBarPlaceholder(UUID uuid, String group) {
         String teamId = getPlayerTeamInGroup(uuid, group);
@@ -204,8 +223,6 @@ public class TeamManager {
         StringBuilder bar = new StringBuilder("§7[");
         for (int i = 0; i < segments; i++) {
             if (i == 10) bar.append("§f┃");
-
-            // 指定された色を使用
             if (i < filled) bar.append(cSelf + "■");
             else bar.append(cEnemy + "■");
         }
@@ -265,6 +282,56 @@ public class TeamManager {
             e.printStackTrace();
         }
     }
+    public void syncAllTeamsTotalScore(UUID uuid, String pointId, int baseAmount) {
+        File pointFile = new File(plugin.getDataFolder(), "points/" + pointId + ".yml");
+        String linkedGroup = YamlConfiguration.loadConfiguration(pointFile).getString("linked_group");
+        if (linkedGroup == null) return;
+
+        String teamId = getPlayerTeamInGroup(uuid, linkedGroup);
+        if (teamId == null) return;
+
+        double multiplier = getTeamActiveMultiplier(linkedGroup, teamId);
+        int finalAmount = (int) (baseAmount * multiplier);
+
+        File file = new File(plugin.getDataFolder(), "teams/member/" + linkedGroup + "/" + teamId + ".yml");
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+
+        // --- 修正ポイント：データの存在チェックと階層の強制修正 ---
+
+        // 1. チーム全体のスコア加算
+        cfg.set("total_score", cfg.getInt("total_score", 0) + finalAmount);
+
+        // 2. 個人の貢献度加算（ここを強化）
+        String path = "scores." + uuid.toString() + ".total";
+
+        // もし既存データが数値型（古い形式）だった場合、一度消して階層を作り直す
+        if (cfg.contains("scores." + uuid.toString()) && !cfg.isConfigurationSection("scores." + uuid.toString())) {
+            cfg.set("scores." + uuid.toString(), null);
+        }
+
+        int currentCont = cfg.getInt(path, 0);
+        cfg.set(path, currentCont + finalAmount);
+
+        try {
+            cfg.save(file);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * プレイヤーが所属している全グループを検索する補助メソッド
+     */
+    public List<String> getAllJoinedGroups(UUID uuid) {
+        List<String> groups = new ArrayList<>();
+        File teamDir = new File(plugin.getDataFolder(), "teams/team");
+        if (teamDir.exists() && teamDir.list() != null) {
+            for (String gId : teamDir.list()) {
+                if (getPlayerTeamInGroup(uuid, gId) != null) groups.add(gId);
+            }
+        }
+        return groups;
+    }
 
     public String getGroupDisplayName(String group) {
         File rewardFile = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
@@ -299,12 +366,7 @@ public class TeamManager {
     }
 
     // --- 設定操作 ---
-    public void setGroupPoint(String group, String pointId) {
-        File file = getRewardFile(group);
-        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
-        cfg.set("linked_point", pointId);
-        try { cfg.save(file); } catch (IOException e) { e.printStackTrace(); }
-    }
+
 
     public boolean toggleGroupSync(String group) {
         File file = getRewardFile(group);
@@ -459,16 +521,25 @@ public class TeamManager {
 
     // 特定のグループ内での所属チームを返す
     public String getPlayerTeamInGroup(UUID uuid, String groupId) {
-        File groupDir = new File(plugin.getDataFolder(), "teams/member/" + groupId);
-        if (!groupDir.exists()) return null;
+        // 実際にプレイヤーが保存されている member フォルダを見る
+        File dir = new File(plugin.getDataFolder(), "teams/member/" + groupId);
 
-        File[] teamFiles = groupDir.listFiles((dir, name) -> name.endsWith(".yml"));
-        if (teamFiles == null) return null;
+        if (!dir.exists() || !dir.isDirectory()) return null;
 
-        for (File tFile : teamFiles) {
-            FileConfiguration cfg = YamlConfiguration.loadConfiguration(tFile);
+        File[] files = dir.listFiles((d, name) -> name.endsWith(".yml"));
+        if (files == null) return null;
+
+        for (File f : files) {
+            FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
+
+            // A. membersリストで判定する場合
             if (cfg.getStringList("members").contains(uuid.toString())) {
-                return tFile.getName().replace(".yml", "");
+                return f.getName().replace(".yml", "");
+            }
+
+            // B. または scores セクションで判定する場合（addMemberで追加していればこちらでも可）
+            if (cfg.contains("scores." + uuid.toString())) {
+                return f.getName().replace(".yml", "");
             }
         }
         return null;
@@ -504,21 +575,22 @@ public class TeamManager {
      */
     public int getMemberRank(String group, String teamId, UUID uuid) {
         File file = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
-        if (!file.exists()) return 0;
-
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
-        if (!cfg.contains("scores")) return 0;
 
-        // スコアをリスト化してソート
+        if (!cfg.contains("scores")) return 1;
+
+        // 全員のスコアをリスト化してソート
         List<Integer> scores = new ArrayList<>();
-        int myScore = cfg.getInt("scores." + uuid.toString(), 0);
+        int myScore = 0;
 
         for (String key : cfg.getConfigurationSection("scores").getKeys(false)) {
-            scores.add(cfg.getInt("scores." + key));
+            int score = cfg.getInt("scores." + key + ".total", 0);
+            scores.add(score);
+            if (key.equals(uuid.toString())) myScore = score;
         }
 
         Collections.sort(scores, Collections.reverseOrder());
-        return scores.indexOf(myScore) + 1; // 順位を返す
+        return scores.indexOf(myScore) + 1;
     }
 
     /**
@@ -545,7 +617,6 @@ public class TeamManager {
     }
 
     public double getTeamActiveMultiplier(String group, String teamId) {
-        // 読み込み先をチーム個別の yml に変更
         File file = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
         if (!file.exists()) return 1.0;
 
@@ -564,13 +635,35 @@ public class TeamManager {
             LocalDateTime start = LocalDateTime.parse(startStr, formatter);
             LocalDateTime end = LocalDateTime.parse(endStr, formatter);
 
-            if (!now.isBefore(start) && !now.isAfter(end)) {
-                return mult;
-            }
+            if (!now.isBefore(start) && !now.isAfter(end)) return mult;
         } catch (Exception e) {
             return 1.0;
         }
         return 1.0;
+    }
+
+    public void setGroupPoint(String groupName, String pointId) {
+        // ポイントの設定ファイルを読み込む（なければ作成）
+        File file = new File(plugin.getDataFolder(), "points/" + pointId + ".yml");
+        if (!file.exists()) {
+            try {
+                file.getParentFile().mkdirs();
+                file.createNewFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+
+        // 紐付け設定を保存
+        cfg.set("linked_group", groupName);
+
+        try {
+            cfg.save(file);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**

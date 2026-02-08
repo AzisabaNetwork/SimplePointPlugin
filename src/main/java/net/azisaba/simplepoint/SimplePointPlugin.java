@@ -50,6 +50,7 @@ public class SimplePointPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(teamGUIManager, this);
         getServer().getPluginManager().registerEvents(teamJoinGUIManager, this);
 
+
         // 1. /ranking コマンドの登録
         RankingShortcutCommand rankingCmd = new RankingShortcutCommand(this);
         getCommand("ranking").setExecutor(rankingCmd);

@@ -316,10 +316,45 @@ public class SPPTCommand implements CommandExecutor {
                 // 全データのリロード実行
                 plugin.getTeamManager().reloadAll();
 
-                // PAPIのキャッシュも更新するために再登録（必要に応じて）
-                // new SimplePointExpansion(plugin).register();
+                // --- ここから追加 ---
+                // 溜まっていた個人ポイントを各チームのスコアに一括同期（振り分け）
+                // 引数1: ポイントID("BetaVS"), 引数2: チームグループ名("BetaVS")
+                plugin.getTeamManager().migrateAllPointsToTeam("BetaVS", "BetaVS");
+                // --- ここまで追加 ---
 
-                sender.sendMessage("§a§l[!] §fSimplePoint の全てのコンフィグをリロードしました。");
+                sender.sendMessage("§a§l[!] §fSimplePoint の全てのコンフィグをリロードし、チームスコアを同期しました。");
+                return true;
+            }
+
+            case "fixdata": {
+                if (!sender.hasPermission("simplepoint.admin")) return true;
+
+                sender.sendMessage("§a[!] データ構造の修復を開始します...");
+                File memberDir = new File(plugin.getDataFolder(), "teams/member");
+                if (!memberDir.exists()) return true;
+
+                int fixedCount = 0;
+                for (File groupFolder : memberDir.listFiles()) {
+                    if (!groupFolder.isDirectory()) continue;
+                    for (File teamFile : groupFolder.listFiles()) {
+                        if (!teamFile.getName().endsWith(".yml")) continue;
+
+                        FileConfiguration cfg = YamlConfiguration.loadConfiguration(teamFile);
+                        if (!cfg.contains("scores")) continue;
+
+                        for (String uuidKey : cfg.getConfigurationSection("scores").getKeys(false)) {
+                            // 古い形式（値がセクションではなく数値）かチェック
+                            if (!cfg.isConfigurationSection("scores." + uuidKey)) {
+                                int oldScore = cfg.getInt("scores." + uuidKey);
+                                cfg.set("scores." + uuidKey, null); // 一旦消す
+                                cfg.set("scores." + uuidKey + ".total", oldScore); // 階層化して再設定
+                                fixedCount++;
+                            }
+                        }
+                        try { cfg.save(teamFile); } catch (IOException e) { e.printStackTrace(); }
+                    }
+                }
+                sender.sendMessage("§a[!] 修復完了: §e" + fixedCount + " §a件のデータを正常化しました。");
                 return true;
             }
 
@@ -408,16 +443,30 @@ public class SPPTCommand implements CommandExecutor {
         }
     }
 
-    private void showTeamMembers(CommandSender sender, String group, String teamId) {
-        List<String> members = plugin.getTeamManager().getMemberNames(group, teamId);
-        String dName = plugin.getTeamManager().getTeamDisplayName(group, teamId);
-        sender.sendMessage("§8§m----------§r " + dName + " §bMembers §8§m----------");
-        if (members.isEmpty()) {
-            sender.sendMessage("§7メンバーはいません。");
-        } else {
-            members.forEach(sender::sendMessage);
+    public void showTeamMembers(CommandSender sender, String groupId, String teamId) {
+        File file = new File(plugin.getDataFolder(), "teams/member/" + groupId + "/" + teamId + ".yml");
+        if (!file.exists()) {
+            sender.sendMessage("§c指定されたチームのデータが見つかりません。");
+            return;
         }
-        sender.sendMessage("§8§m------------------------------------");
+
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+        List<String> members = cfg.getStringList("members");
+        String teamDisplay = plugin.getTeamManager().getTeamDisplayName(groupId, teamId);
+
+        sender.sendMessage("§8§m----------§r §6" + teamDisplay + " §eMEMBERS §8§m----------");
+
+        if (members.isEmpty()) {
+            sender.sendMessage(" §7(メンバーはいません)");
+        } else {
+            for (String uuidStr : members) {
+                // 重要： .total まで指定して取得する
+                int score = cfg.getInt("scores." + uuidStr + ".total", 0);
+                String name = Bukkit.getOfflinePlayer(UUID.fromString(uuidStr)).getName();
+                sender.sendMessage(" §7- §f" + (name != null ? name : "Unknown") + " §8| §e" + score + "pt");
+            }
+        }
+        sender.sendMessage("§8§m--------------------------------------");
     }
 
 
@@ -460,12 +509,21 @@ public class SPPTCommand implements CommandExecutor {
         // total_score(チーム累計)を取得
         int myTeamTotal = plugin.getTeamManager().getTeamTotalScore(group, teamId);
 
-        java.util.TreeMap<String, Integer> scoreMap = new java.util.TreeMap<>();
+//        java.util.TreeMap<String, Integer> scoreMap = new java.util.TreeMap<>();
+//        if (mCfg.contains("scores")) {
+//            for (String key : mCfg.getConfigurationSection("scores").getKeys(false)) {
+//                // ここを .total まで指定するように修正！
+//                int val = mCfg.getInt("scores." + key + ".total", 0);
+//                scoreMap.put(key, val);
+//            }
+//        }
+        // --- scoreMap を正しく作成するコード ---
+        Map<String, Integer> scoreMap = new HashMap<>();
         if (mCfg.contains("scores")) {
-            for (String key : mCfg.getConfigurationSection("scores").getKeys(false)) {
-                // ここを .total まで指定するように修正！
-                int val = mCfg.getInt("scores." + key + ".total", 0);
-                scoreMap.put(key, val);
+            for (String uuidKey : mCfg.getConfigurationSection("scores").getKeys(false)) {
+                // scores.UUID.total を取得する。階層化されているため getInt(path + ".total") が必須
+                int score = mCfg.getInt("scores." + uuidKey + ".total", 0);
+                scoreMap.put(uuidKey, score);
             }
         }
 
@@ -517,12 +575,13 @@ public class SPPTCommand implements CommandExecutor {
         }
 
         // --- YOUR STATS ---
-        int myScore = scoreMap.getOrDefault(uuid.toString(), 0);
+        int myScore = mCfg.getInt("scores." + uuid.toString() + ".total", 0);
         int myRank = plugin.getTeamManager().getMemberRank(group, teamId, uuid);
 
         player.sendMessage("");
         player.sendMessage(" §e§l▶ §f§lYOUR STATS");
         player.sendMessage("  §7個人貢献: §f" + myScore + " pt §8| §7倍率: §d" + multiplier + "x");
+
 
         if (myRank > 1) {
             // 次のランクへの差

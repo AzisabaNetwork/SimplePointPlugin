@@ -283,39 +283,73 @@ public class TeamManager {
         }
     }
     public void syncAllTeamsTotalScore(UUID uuid, String pointId, int baseAmount) {
-        File pointFile = new File(plugin.getDataFolder(), "points/" + pointId + ".yml");
-        String linkedGroup = YamlConfiguration.loadConfiguration(pointFile).getString("linked_group");
-        if (linkedGroup == null) return;
-
-        String teamId = getPlayerTeamInGroup(uuid, linkedGroup);
-        if (teamId == null) return;
-
-        double multiplier = getTeamActiveMultiplier(linkedGroup, teamId);
-        int finalAmount = (int) (baseAmount * multiplier);
-
-        File file = new File(plugin.getDataFolder(), "teams/member/" + linkedGroup + "/" + teamId + ".yml");
-        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
-
-        // --- 修正ポイント：データの存在チェックと階層の強制修正 ---
-
-        // 1. チーム全体のスコア加算
-        cfg.set("total_score", cfg.getInt("total_score", 0) + finalAmount);
-
-        // 2. 個人の貢献度加算（ここを強化）
-        String path = "scores." + uuid.toString() + ".total";
-
-        // もし既存データが数値型（古い形式）だった場合、一度消して階層を作り直す
-        if (cfg.contains("scores." + uuid.toString()) && !cfg.isConfigurationSection("scores." + uuid.toString())) {
-            cfg.set("scores." + uuid.toString(), null);
+        // 1. reward フォルダ内の全設定ファイルをスキャン
+        File rewardDir = new File(plugin.getDataFolder(), "teams/reward/");
+        if (!rewardDir.exists()) {
+            //plugin.getLogger().warning("[Debug] reward フォルダが存在しません。");
+            return;
         }
 
-        int currentCont = cfg.getInt(path, 0);
-        cfg.set(path, currentCont + finalAmount);
+        File[] rewardFiles = rewardDir.listFiles((dir, name) -> name.endsWith(".yml"));
+        if (rewardFiles == null) return;
 
-        try {
-            cfg.save(file);
-        } catch (IOException e) {
-            e.printStackTrace();
+        for (File rewardFile : rewardFiles) {
+            FileConfiguration rCfg = YamlConfiguration.loadConfiguration(rewardFile);
+
+            // reward/グループ名.yml の linked_point を取得
+            String linkedPoint = rCfg.getString("linked_point");
+
+            // 獲得したポイントIDと一致するか確認 (nullチェック含む)
+            if (linkedPoint != null && linkedPoint.equalsIgnoreCase(pointId)) {
+                // ファイル名からグループ名を取得 (例: BetaVS.yml -> BetaVS)
+                String groupName = rewardFile.getName().replace(".yml", "");
+
+                // 2. プレイヤーがこのグループのどのチームに所属しているか特定
+                String teamId = getPlayerTeamInGroup(uuid, groupName);
+                if (teamId == null) {
+                    //plugin.getLogger().info("[Debug] プレイヤーはグループ " + groupName + " でチーム未所属です。");
+                    continue;
+                }
+
+                // 3. 最新の倍率を計算 (時間判定を含む修正版メソッド)
+                double multiplier = getTeamActiveMultiplier(groupName, teamId);
+                int finalAmount = (int) (baseAmount * multiplier);
+
+                // 4. チームメンバーファイルの読み込みと加算
+                File memberFile = new File(plugin.getDataFolder(), "teams/member/" + groupName + "/" + teamId + ".yml");
+                if (!memberFile.exists()) continue;
+
+                FileConfiguration mCfg = YamlConfiguration.loadConfiguration(memberFile);
+
+                // A. チーム全体の累計スコアを加算
+                mCfg.set("total_score", mCfg.getInt("total_score", 0) + finalAmount);
+
+                // B. 個人の貢献度スコアの加算 (階層化対応)
+                String scorePath = "scores." + uuid.toString();
+                String totalPath = scorePath + ".total";
+
+                if (mCfg.contains(scorePath) && !mCfg.isConfigurationSection(scorePath)) {
+                    mCfg.set(scorePath, null);
+                }
+
+                int currentCont = mCfg.getInt(totalPath, 0);
+                mCfg.set(totalPath, currentCont + finalAmount);
+
+                // C. メンバーリストへの自動登録 (保険)
+                List<String> members = mCfg.getStringList("members");
+                if (!members.contains(uuid.toString())) {
+                    members.add(uuid.toString());
+                    mCfg.set("members", members);
+                }
+
+                // 5. 保存
+                try {
+                    mCfg.save(memberFile);
+                    //plugin.getLogger().info("[Debug] 同期成功: グループ=" + groupName + ", チーム=" + teamId + ", 倍率=" + multiplier + "x (+" + finalAmount + "pt)");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
@@ -623,23 +657,75 @@ public class TeamManager {
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
         if (!cfg.contains("multiplier")) return 1.0;
 
-        double mult = cfg.getDouble("multiplier.value", 1.0);
+        double value = cfg.getDouble("multiplier.value", 1.0);
         String startStr = cfg.getString("multiplier.start");
         String endStr = cfg.getString("multiplier.end");
 
         if (startStr == null || endStr == null) return 1.0;
 
-        try {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd-HH:mm");
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime start = LocalDateTime.parse(startStr, formatter);
-            LocalDateTime end = LocalDateTime.parse(endStr, formatter);
+        // --- 修正: セミコロンをコロンに置換してフォーマットを修正 ---
+        startStr = startStr.replace(";", ":");
+        endStr = endStr.replace(";", ":");
 
-            if (!now.isBefore(start) && !now.isAfter(end)) return mult;
-        } catch (Exception e) {
-            return 1.0;
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy/MM/dd-HH:mm");
+        try {
+            long now = System.currentTimeMillis();
+            long start = sdf.parse(startStr).getTime();
+            long end = sdf.parse(endStr).getTime();
+
+            // 現在時刻が開始と終了の間にあるか判定
+            if (now >= start && now <= end) {
+                return value;
+            }
+        } catch (java.text.ParseException e) {
+            plugin.getLogger().warning("[Debug] 倍率の日付解析に失敗しました: " + startStr + " ~ " + endStr);
         }
-        return 1.0;
+
+        return 1.0; // 期間外、または解析失敗時は1.0倍
+    }
+
+    public void migrateAllPointsToTeam(String pointId, String groupName) {
+        // 1. 個人ポイントファイルの読み込み
+        File pointFile = new File(plugin.getDataFolder(), "points/" + pointId + ".yml");
+        if (!pointFile.exists()) return;
+        FileConfiguration pCfg = YamlConfiguration.loadConfiguration(pointFile);
+
+        // 2. 全てのチームファイルをスキャンして更新する
+        File teamDir = new File(plugin.getDataFolder(), "teams/member/" + groupName + "/");
+        if (!teamDir.exists()) return;
+
+        for (File teamFile : teamDir.listFiles((dir, name) -> name.endsWith(".yml"))) {
+            FileConfiguration tCfg = YamlConfiguration.loadConfiguration(teamFile);
+            int teamTotalScore = 0;
+
+            // チームファイル内の全メンバーをチェック
+            List<String> members = tCfg.getStringList("members");
+            for (String uuidStr : members) {
+                // ポイントファイルにそのUUIDのデータがあるか確認
+                if (pCfg.contains(uuidStr + ".total")) {
+                    int personalTotal = pCfg.getInt(uuidStr + ".total");
+
+                    // チーム側の scores.(UUID).total に上書き保存
+                    tCfg.set("scores." + uuidStr + ".total", personalTotal);
+
+                    // チーム全体の合計用に加算
+                    teamTotalScore += personalTotal;
+                } else {
+                    // ポイントファイルにデータがないメンバーは現在のチーム内スコアを維持
+                    teamTotalScore += tCfg.getInt("scores." + uuidStr + ".total", 0);
+                }
+            }
+
+            // チーム全体の合計スコアを更新
+            tCfg.set("total_score", teamTotalScore);
+
+            try {
+                tCfg.save(teamFile);
+                plugin.getLogger().info("§a[Migration] " + teamFile.getName() + " を更新しました。合計: " + teamTotalScore);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void setGroupPoint(String groupName, String pointId) {

@@ -1,6 +1,7 @@
-package net.azisaba.simplepoint;
+package net.azisaba.simplepoint.managers;
 
 import net.azisaba.simplepoint.PointAddEvent; // パッケージ名に合わせて適宜修正してください
+import net.azisaba.simplepoint.SimplePointPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;

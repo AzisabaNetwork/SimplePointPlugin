@@ -1,5 +1,6 @@
-package net.azisaba.simplepoint;
+package net.azisaba.simplepoint.managers;
 
+import net.azisaba.simplepoint.SimplePointPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.ChatColor;
@@ -18,7 +19,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.UUID;
 
 public class TeamJoinGUIManager implements Listener {
     private final SimplePointPlugin plugin;

@@ -1,4 +1,6 @@
-package net.azisaba.simplepoint;
+package net.azisaba.simplepoint.managers;
+
+import net.azisaba.simplepoint.SimplePointPlugin;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;

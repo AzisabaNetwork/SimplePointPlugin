@@ -1,5 +1,6 @@
-package net.azisaba.simplepoint;
+package net.azisaba.simplepoint.managers;
 
+import net.azisaba.simplepoint.SimplePointPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
@@ -14,7 +15,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.Date;
 
 public class TeamManager {
     private final SimplePointPlugin plugin;

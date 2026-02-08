@@ -1,5 +1,6 @@
-package net.azisaba.simplepoint;
+package net.azisaba.simplepoint.listeners;
 
+import net.azisaba.simplepoint.SimplePointPlugin;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;

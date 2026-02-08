@@ -1,6 +1,7 @@
-package net.azisaba.simplepoint;
+package net.azisaba.simplepoint.listeners;
 
 import net.azisaba.simplepoint.PointAddEvent;
+import net.azisaba.simplepoint.SimplePointPlugin;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 

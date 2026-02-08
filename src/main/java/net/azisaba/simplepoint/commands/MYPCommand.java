@@ -1,5 +1,6 @@
-package net.azisaba.simplepoint;
+package net.azisaba.simplepoint.commands;
 
+import net.azisaba.simplepoint.SimplePointPlugin;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;

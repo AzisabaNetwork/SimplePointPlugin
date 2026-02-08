@@ -1,5 +1,12 @@
 package net.azisaba.simplepoint;
 
+import net.azisaba.simplepoint.commands.*;
+import net.azisaba.simplepoint.commands.completers.SPPTTabCompleter;
+import net.azisaba.simplepoint.commands.completers.SPPTabCompleter;
+import net.azisaba.simplepoint.commands.completers.SPTTabCompleter;
+import net.azisaba.simplepoint.listeners.PointSyncListener;
+import net.azisaba.simplepoint.listeners.TeamAdminGUIListener;
+import net.azisaba.simplepoint.managers.*;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 

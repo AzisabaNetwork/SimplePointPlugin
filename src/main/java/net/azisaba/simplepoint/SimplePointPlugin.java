@@ -7,6 +7,7 @@ import net.azisaba.simplepoint.commands.completers.SPTTabCompleter;
 import net.azisaba.simplepoint.listeners.PointSyncListener;
 import net.azisaba.simplepoint.listeners.TeamAdminGUIListener;
 import net.azisaba.simplepoint.managers.*;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 
@@ -63,6 +64,10 @@ public class SimplePointPlugin extends JavaPlugin {
         MYPCommand mypCmd = new MYPCommand(this);
         getCommand("myp").setExecutor(mypCmd);
         getCommand("myp").setTabCompleter(mypCmd);
+
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            new SimplePointExpansion(this).register();
+        }
 
 
         // ★ 追加: 個人ポイント獲得をチームに同期させるリスナー

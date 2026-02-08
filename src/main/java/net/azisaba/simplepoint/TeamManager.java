@@ -168,6 +168,104 @@ public class TeamManager {
         return ChatColor.translateAlternateColorCodes('&', tCfg.getString("display_name", teamId));
     }
 
+    // TeamManager.java 内に追加
+    public String getVSBarPlaceholder(UUID uuid, String group) {
+        String teamId = getPlayerTeamInGroup(uuid, group);
+        if (teamId == null) return "§7[ §8---------- §fVS §8---------- §7]";
+
+        File rewardFile = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
+        FileConfiguration gCfg = YamlConfiguration.loadConfiguration(rewardFile);
+
+        if (!gCfg.getBoolean("battle.active", false)) return "§8[§7Battle Inactive§8]";
+
+        String t1 = gCfg.getString("battle.team1");
+        String t2 = gCfg.getString("battle.team2");
+        String enemyId = (teamId.equals(t1)) ? t2 : t1;
+
+        int myTotal = getTeamTotalScore(group, teamId);
+        int enemyTotal = getTeamTotalScore(group, enemyId);
+
+        // --- コンフィグから色を取得 (デフォルトは §b と §e) ---
+        String cSelf = gCfg.getString("battle.color_self", "§b").replace("&", "§");
+        String cEnemy = gCfg.getString("battle.color_enemy", "§e").replace("&", "§");
+
+        return buildVSBar(myTotal, enemyTotal, cSelf, cEnemy);
+    }
+
+    // 引数に色を追加しました
+    public String buildVSBar(int p1, int p2, String cSelf, String cEnemy) {
+        int total = p1 + p2;
+        if (total == 0) return "§7[ §8---------- §f┃ §8---------- §7] §f§lWAITING...";
+
+        double pct = ((double) p1 / total) * 100;
+        int segments = 20;
+        int filled = (int) (pct / (100.0 / segments));
+
+        StringBuilder bar = new StringBuilder("§7[");
+        for (int i = 0; i < segments; i++) {
+            if (i == 10) bar.append("§f┃");
+
+            // 指定された色を使用
+            if (i < filled) bar.append(cSelf + "■");
+            else bar.append(cEnemy + "■");
+        }
+        bar.append("§7]");
+
+        String status;
+        if (pct > 80) status = cSelf + "§lDOMINATING!!";
+        else if (pct > 60) status = cSelf + "§lADVANTAGE";
+        else if (pct > 40) status = "§f§lEVEN";
+        else if (pct > 20) status = cEnemy + "§lPUSHING...";
+        else status = cEnemy + "§lCRITICAL!!";
+
+        return bar.toString() + " " + status + " §8(" + cSelf + (int)pct + "% §7vs " + cEnemy + (100 - (int)pct) + "%§8)";
+    }
+
+    public int getTeamTotalScore(String group, String teamId) {
+        File file = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
+        if (!file.exists()) return 0;
+        return YamlConfiguration.loadConfiguration(file).getInt("total_score", 0);
+    }
+
+    public void reloadAll() {
+        // もし表示名などをMapにキャッシュ（保存）している場合はここでclear()する
+        // 例: teamNameCache.clear();
+
+        // プラグイン全体のコンフィグを読み直し
+        plugin.reloadConfig();
+
+        // ログに出力
+        plugin.getLogger().info("All configurations and caches have been reloaded.");
+    }
+
+    /**
+     * ポイント加算イベントが発生した時に「減らないポイント」を保存する処理
+     * (Listenerクラスに作っても良いですが、管理上ここに書くのが楽です)
+     */
+    public void syncTotalScore(UUID uuid, int amount) {
+        String group = getPlayerGroup(uuid);
+        if (group == null) return;
+        String teamId = getPlayerTeamInGroup(uuid, group);
+        if (teamId == null) return;
+
+        File file = new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml");
+        FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+
+        // チーム全体の累計を更新
+        int currentTotal = cfg.getInt("total_score", 0);
+        cfg.set("total_score", currentTotal + amount);
+
+        // プレイヤー個人のチーム内累計を更新
+        int playerTotal = cfg.getInt("scores." + uuid + ".total", 0);
+        cfg.set("scores." + uuid + ".total", playerTotal + amount);
+
+        try {
+            cfg.save(file);
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public String getGroupDisplayName(String group) {
         File rewardFile = new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml");
         if (!rewardFile.exists()) return group;

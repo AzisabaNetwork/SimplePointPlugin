@@ -61,16 +61,41 @@ public class SPPTCommand implements CommandExecutor {
         String sub = args[0].toLowerCase();
 
         switch (sub) {
-            case "create":
+            case "create": {
                 if (args.length < 3) {
                     sender.sendMessage("§c使用法: /sppt create <ID> <表示名(カラーコード可)>");
                     return true;
                 }
-                // args[2] を表示名として渡す
-                plugin.getTeamManager().createGroup(args[1], args[2]);
-                sender.sendMessage("§aグループ §l" + args[1] + " §aを名称 §r" +
-                        ChatColor.translateAlternateColorCodes('&', args[2]) + " §aで作成しました。");
+                String groupId = args[1];
+                String displayName = args[2];
+
+                // 1. まずはグループのディレクトリや基本的な管理構造を作成
+                plugin.getTeamManager().createGroup(groupId, displayName);
+
+                // 2. デフォルト設定を yml に書き込む (TeamManager.java側で実装しても良いですが、ここで完結させます)
+                File rewardFile = new File(plugin.getDataFolder(), "teams/reward/" + groupId + ".yml");
+                FileConfiguration gCfg = YamlConfiguration.loadConfiguration(rewardFile);
+
+                // デフォルトの設定値をセット (ファイルが存在しない場合のみ、あるいは上書き)
+                gCfg.set("display_name", displayName);
+                gCfg.set("battle.active", false); // 最初はVSモードをオフにしておく
+                gCfg.set("battle.team1", "teamA"); // 対戦予定スロット1
+                gCfg.set("battle.team2", "teamB"); // 対戦予定スロット2
+                gCfg.set("battle.color_self", "&b"); // デフォルトの自分色
+                gCfg.set("battle.color_enemy", "&e"); // デフォルトの相手色
+
+                try {
+                    gCfg.save(rewardFile);
+                } catch (java.io.IOException e) {
+                    e.printStackTrace();
+                    sender.sendMessage("§c設定ファイルの保存中にエラーが発生しました。");
+                }
+
+                sender.sendMessage("§aグループ §l" + groupId + " §aを名称 §r" +
+                        ChatColor.translateAlternateColorCodes('&', displayName) + " §aで作成しました。");
+                sender.sendMessage("§7(デフォルトの対戦設定を reward/" + groupId + ".yml に生成しました)");
                 break;
+            }
 
             case "teamcreate":
                 if (args.length < 4) {
@@ -282,6 +307,22 @@ public class SPPTCommand implements CommandExecutor {
                 return true;
             }
 
+            case "reload": {
+                if (!sender.hasPermission("simplepoint.admin")) {
+                    sender.sendMessage("§c権限がありません。");
+                    return true;
+                }
+
+                // 全データのリロード実行
+                plugin.getTeamManager().reloadAll();
+
+                // PAPIのキャッシュも更新するために再登録（必要に応じて）
+                // new SimplePointExpansion(plugin).register();
+
+                sender.sendMessage("§a§l[!] §fSimplePoint の全てのコンフィグをリロードしました。");
+                return true;
+            }
+
             case "deletegroup": {
                 if (args.length < 2) {
                     sender.sendMessage("§c使用法: /sppt deletegroup <グループID>");
@@ -446,7 +487,7 @@ public class SPPTCommand implements CommandExecutor {
             player.sendMessage(" §e所属チーム:" + teamDisplay + " §7合計§b§l" + myTeamTotal + "§7pt");
             player.sendMessage("");
             player.sendMessage(" §f" + teamDisplay + " §b§l" + myTeamTotal + " pt §7(" + memberCount + "人) " );
-            player.sendMessage(" " + buildVSBar(myTeamTotal, enemyTotal));
+            player.sendMessage(" " + plugin.getTeamManager().buildVSBar(myTeamTotal, enemyTotal, "§b", "§e"));
             player.sendMessage(" §f" + plugin.getTeamManager().getTeamDisplayName(group, enemyId) + " §e§l" + enemyTotal + " pt §7(" + enemyCount + "人)");
         } else {
             player.sendMessage("§8§m      §r " + groupDisplay + " §f§lTEAM INFO §r §8§m      ");
@@ -500,31 +541,31 @@ public class SPPTCommand implements CommandExecutor {
         return ChatColor.translateAlternateColorCodes('&', name);
     }
 
-    private String buildVSBar(int p1, int p2) {
-        int total = p1 + p2;
-        if (total == 0) return "§7[ §8---------- §fVS §8---------- §7]";
-
-        double pct = ((double) p1 / total) * 100;
-        int segments = 20;
-        int filled = (int) (pct / (100.0 / segments));
-
-        StringBuilder bar = new StringBuilder("§7[");
-        for (int i = 0; i < segments; i++) {
-            if (i == 10) bar.append("§f┃"); // センター
-            if (i < filled) bar.append("§b■");
-            else bar.append("§e■");
-        }
-        bar.append("§7]");
-
-        String status;
-        if (pct > 80) status = "§b§lDOMINATING!!";
-        else if (pct > 60) status = "§3§lADVANTAGE";
-        else if (pct > 40) status = "§f§lEVEN";
-        else if (pct > 20) status = "§6§lPUSHING...";
-        else status = "§c§lCRITICAL!!";
-
-        return bar.toString() + " " + status + " §8(§b" + (int)pct + "% §7vs §e" + (100 - (int)pct) + "%§8)";
-    }
+//    private String buildVSBar(int p1, int p2) {
+//        int total = p1 + p2;
+//        if (total == 0) return "§7[ §8---------- §fVS §8---------- §7]";
+//
+//        double pct = ((double) p1 / total) * 100;
+//        int segments = 20;
+//        int filled = (int) (pct / (100.0 / segments));
+//
+//        StringBuilder bar = new StringBuilder("§7[");
+//        for (int i = 0; i < segments; i++) {
+//            if (i == 10) bar.append("§f┃"); // センター
+//            if (i < filled) bar.append("§b■");
+//            else bar.append("§e■");
+//        }
+//        bar.append("§7]");
+//
+//        String status;
+//        if (pct > 80) status = "§b§lDOMINATING!!";
+//        else if (pct > 60) status = "§3§lADVANTAGE";
+//        else if (pct > 40) status = "§f§lEVEN";
+//        else if (pct > 20) status = "§6§lPUSHING...";
+//        else status = "§c§lCRITICAL!!";
+//
+//        return bar.toString() + " " + status + " §8(§b" + (int)pct + "% §7vs §e" + (100 - (int)pct) + "%§8)";
+//    }
 
     private void sendManual(CommandSender sender) {
         sender.sendMessage("§8§m-----------------------------------------");
@@ -607,7 +648,7 @@ public class SPPTCommand implements CommandExecutor {
         sender.sendMessage("  §f/sppt §bcreate §3<ID> <Name> §7- グループ作成");
         sender.sendMessage("  §f/sppt §bteamcreate §3<G> <ID> <Name> §7- チーム作成");
         sender.sendMessage("  §f/sppt §bjoin §3<G> <ID> <Player> §7- メンバー追加");
-        sender.sendMessage("  §f/sppt §bjoin §3<G> <ID> <Player> §7- メンバー脱退");
+        sender.sendMessage("  §f/sppt §bleave §3<G> <ID> <Player> §7- メンバー脱退");
         sender.sendMessage("");
         sender.sendMessage(" §e§l▶ §a§l対戦・ポイント倍率設定");
         sender.sendMessage("  §f/sppt §avsteam §3<G> <T1> <T2> §7- VSモード(対戦)開始");
@@ -626,6 +667,7 @@ public class SPPTCommand implements CommandExecutor {
         sender.sendMessage("  §f/sppt §dinfo §3<G> <T> §7- 運営用簡易チーム情報");
         sender.sendMessage("  §f/sppt §duserinfo §3<Player> §7- プレイヤー情報");
         sender.sendMessage("  §f/sppt §ddeletegroup §3<G> §7- 指定したグループを削除");
+        sender.sendMessage("  §f/sppt §freload §7- コンフィグリロード");
         sender.sendMessage("");
         sender.sendMessage(" §7※ §3<G>§7=グループID, §3<T>§7=チームID, §3<Mode>§7=choice/random");
         sender.sendMessage(" §7※ §3<Auto>§7=true/false (ログイン時に表示するか)");

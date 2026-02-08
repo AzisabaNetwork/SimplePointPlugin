@@ -30,7 +30,7 @@ public class SPPTTabCompleter implements TabCompleter {
                     "create", "teamcreate", "join", "leave", "vsteam", "finishvsmode",
                     "multiplier", "setpoint", "teaminfo", "toggle", "setpoint_value",
                     "setjoingui", "teamjoingui", "rewardgui", "member", "info", "help",
-                    "userinfo", "deletegroup" // 追加
+                    "userinfo", "deletegroup" ,"reload"// 追加
             );
             return StringUtil.copyPartialMatches(args[0], subs, completions);
         }

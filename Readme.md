@@ -1,5 +1,5 @@
 # SimplePoint
-**Version:** 1.4.0<br>
+**Version:** 2.0.0<br>
 **Native Minecraft Version:** 1.16.5<br>
 **Author:** pino223<br>
 **LICENSE:** [GPL-3.0](LICENSE)<br>
@@ -92,4 +92,5 @@ customlore:
 `yyyy/mm/dd.log` に記録します。
 
 ***
-teamに関するコマンドがありますが未実装です！
+team機能実装<br>
+後日追記

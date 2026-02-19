@@ -316,11 +316,8 @@ public class SPPTCommand implements CommandExecutor {
                 // 全データのリロード実行
                 plugin.getTeamManager().reloadAll();
 
-                // --- ここから追加 ---
                 // 溜まっていた個人ポイントを各チームのスコアに一括同期（振り分け）
-                // 引数1: ポイントID("BetaVS"), 引数2: チームグループ名("BetaVS")
-                plugin.getTeamManager().migrateAllPointsToTeam("BetaVS", "BetaVS");
-                // --- ここまで追加 ---
+                plugin.getTeamManager().migrateAllPointsToTeam("2026vt_wb");
 
                 sender.sendMessage("§a§l[!] §fSimplePoint の全てのコンフィグをリロードし、チームスコアを同期しました。");
                 return true;

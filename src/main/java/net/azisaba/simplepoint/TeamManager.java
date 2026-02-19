@@ -684,13 +684,26 @@ public class TeamManager {
         return 1.0; // 期間外、または解析失敗時は1.0倍
     }
 
-    public void migrateAllPointsToTeam(String pointId, String groupName) {
-        // 1. 個人ポイントファイルの読み込み
+    public void migrateAllPointsToTeam(String groupName) {
+        // 1. Rewardファイルを確認して、紐づくポイントIDを特定する
+        File rewardFile = new File(plugin.getDataFolder(), "teams/reward/" + groupName + ".yml");
+        String pointId = groupName; // デフォルトはグループ名と同じにする
+
+        if (rewardFile.exists()) {
+            FileConfiguration rCfg = YamlConfiguration.loadConfiguration(rewardFile);
+            // linked_point が設定されていればそれを使い、なければ groupName を使う
+            pointId = rCfg.getString("linked_point", groupName);
+        }
+
+        // 2. 特定したポイントIDのファイルを読み込む
         File pointFile = new File(plugin.getDataFolder(), "points/" + pointId + ".yml");
-        if (!pointFile.exists()) return;
+        if (!pointFile.exists()) {
+            plugin.getLogger().warning("§c[Migration] ポイントファイルが見つかりません: " + pointId + ".yml");
+            return;
+        }
         FileConfiguration pCfg = YamlConfiguration.loadConfiguration(pointFile);
 
-        // 2. 全てのチームファイルをスキャンして更新する
+        // 3. 全てのチームファイルをスキャン
         File teamDir = new File(plugin.getDataFolder(), "teams/member/" + groupName + "/");
         if (!teamDir.exists()) return;
 
@@ -698,30 +711,27 @@ public class TeamManager {
             FileConfiguration tCfg = YamlConfiguration.loadConfiguration(teamFile);
             int teamTotalScore = 0;
 
-            // チームファイル内の全メンバーをチェック
             List<String> members = tCfg.getStringList("members");
             for (String uuidStr : members) {
-                // ポイントファイルにそのUUIDのデータがあるか確認
+                // ポイントファイルからデータを取得
                 if (pCfg.contains(uuidStr + ".total")) {
                     int personalTotal = pCfg.getInt(uuidStr + ".total");
 
-                    // チーム側の scores.(UUID).total に上書き保存
+                    // チームファイルの scores.(UUID).total を最新値で上書き
                     tCfg.set("scores." + uuidStr + ".total", personalTotal);
-
-                    // チーム全体の合計用に加算
                     teamTotalScore += personalTotal;
                 } else {
-                    // ポイントファイルにデータがないメンバーは現在のチーム内スコアを維持
+                    // データがない場合は現在のチーム内スコアを維持
                     teamTotalScore += tCfg.getInt("scores." + uuidStr + ".total", 0);
                 }
             }
 
-            // チーム全体の合計スコアを更新
+            // チーム全体の合計スコアを再計算
             tCfg.set("total_score", teamTotalScore);
 
             try {
                 tCfg.save(teamFile);
-                plugin.getLogger().info("§a[Migration] " + teamFile.getName() + " を更新しました。合計: " + teamTotalScore);
+                plugin.getLogger().info("§a[Migration] " + teamFile.getName() + " (PointID: " + pointId + ") を同期しました。合計: " + teamTotalScore);
             } catch (IOException e) {
                 e.printStackTrace();
             }

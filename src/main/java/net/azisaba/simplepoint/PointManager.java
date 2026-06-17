@@ -121,6 +121,8 @@ public class PointManager {
         if (configs.containsKey(id)) return configs.get(id);
 
         File file = new File(pointFolder, id + ".yml");
+        if (!file.exists()) return null;
+
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(file);
         configs.put(id, cfg);
         return cfg;
@@ -138,7 +140,8 @@ public class PointManager {
 
     public int getPoint(String id, UUID uuid) {
         FileConfiguration cfg = getPointConfig(id);
-        return cfg.getInt(uuid.toString() + ".current", 0);
+        if (cfg == null) return 0;
+        return cfg.getInt(uuid + ".current", 0);
     }
 
     public int getTotalPoint(String id, UUID uuid) {
@@ -173,15 +176,16 @@ public class PointManager {
     }
 
 
-    public void takePoint(String id, UUID uuid, int amount) {
+    public boolean takePoint(String id, UUID uuid, int amount) {
+        if (amount < 0) return false;
         FileConfiguration cfg = getPointConfig(id);
+        if (cfg == null) return false;
         String path = uuid.toString() + ".current";
         int current = cfg.getInt(path, 0);
-        cfg.set(path, Math.max(0, current - amount));
+        if (current < amount) return false;
+        cfg.set(path, current - amount);
         savePointConfig(id);
-        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            org.bukkit.Bukkit.dispatchCommand(org.bukkit.Bukkit.getConsoleSender(), "papi reload");
-        }, 1L);
+        return true;
     }
 
     // 表示名管理用

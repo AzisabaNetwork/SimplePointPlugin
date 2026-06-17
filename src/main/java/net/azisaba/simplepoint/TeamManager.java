@@ -540,6 +540,8 @@ public class TeamManager {
         // UUIDをリストから削除
         members.remove(uuid.toString());
         cfg.set("members", members);
+        cfg.set("scores." + uuid, null);
+        cfg.set("contributions." + uuid, null);
 
         // 貢献度データ(contributions)もリセットする場合
         if (cfg.contains("contributions." + uuid.toString())) {
@@ -845,7 +847,11 @@ public class TeamManager {
 
     public File getTeamFile(String group, String teamId) { return new File(plugin.getDataFolder(), "teams/team/" + group + "/" + teamId + ".yml"); }
     public File getMemberFile(String group, String teamId) { return new File(plugin.getDataFolder(), "teams/member/" + group + "/" + teamId + ".yml"); }
-    public File getRewardFile(String group) { return new File(plugin.getDataFolder(), "teams/reward/" + group + ".yml"); }
+    public File getRewardFile(String group) {
+        File dir = new File(plugin.getDataFolder(), "teams/reward");
+        if (!dir.exists()) dir.mkdirs();
+        return new File(dir, group + ".yml");
+    }
 
     public void saveTeamReward(String group, int slot, ItemStack item, int price, int teamReq, int contReq, int stock, int teamStock, boolean isGlobalStock) {
         File file = getRewardFile(group);

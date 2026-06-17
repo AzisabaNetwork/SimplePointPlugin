@@ -4,6 +4,7 @@ import net.azisaba.simplepoint.SimplePointPlugin;
 import net.azisaba.simplepoint.TeamManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -16,6 +17,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.Registry;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,7 +76,7 @@ public class TeamGUIManager implements Listener {
             ItemStack lock = new ItemStack(Material.BARRIER);
             ItemMeta meta = lock.getItemMeta();
             meta.setDisplayName("§c§l報酬ロック中");
-            meta.addEnchant(Enchantment.LUCK, 1, true);
+            meta.addEnchant(Registry.ENCHANTMENT.get(NamespacedKey.minecraft("luck")), 1, true);
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             List<String> lore = new ArrayList<>();
             lore.add("§8チームの目標スコアに達していないため封印されています。");
